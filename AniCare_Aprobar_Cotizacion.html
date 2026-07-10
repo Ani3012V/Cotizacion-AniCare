@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AniCare — Aprobación de Cotización</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:white;border-radius:20px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.1);overflow:hidden}
+.header{background:linear-gradient(135deg,#40916C,#52B788);padding:22px 24px;text-align:center}
+.header h1{color:white;font-size:16px;font-weight:900}
+.header p{color:rgba(255,255,255,.85);font-size:12px;margin-top:4px}
+.body{padding:24px}
+.loading{text-align:center;padding:40px 20px;color:#718096;font-size:13px}
+.spinner{width:32px;height:32px;border:3px solid #D8F3DC;border-top-color:#40916C;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.q-num{font-size:12px;font-weight:800;color:#40916C;background:#F0FAF4;border-radius:8px;padding:6px 12px;display:inline-block;margin-bottom:14px}
+.q-client{font-size:15px;font-weight:800;color:#1B4332;margin-bottom:16px}
+.svc-block{margin-bottom:14px}
+.svc-name{font-size:11px;font-weight:800;color:#2D6A4F;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+.svc-item{font-size:13px;color:#4a5568;padding:4px 0;border-bottom:1px solid #f0f2f5;line-height:1.5}
+
+.totals{background:#F0FAF4;border-radius:12px;padding:14px 16px;margin-top:16px}
+.t-row{display:flex;justify-content:space-between;font-size:13px;color:#2D6A4F;padding:3px 0}
+.t-row.final{font-size:20px;font-weight:900;color:#1B4332;border-top:2px solid #D8F3DC;margin-top:6px;padding-top:8px}
+
+.btns{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.btn-aprobar{background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer}
+.btn-cancelar{background:none;border:1.5px solid #FCA5A5;color:#DC2626;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer}
+
+.motivo-box{display:none;margin-top:12px;background:#FFF5F5;border:1.5px solid #FED7D7;border-radius:10px;padding:12px}
+.motivo-box select{width:100%;border:1.5px solid #FCA5A5;border-radius:8px;padding:9px;font-size:13px;margin-bottom:8px}
+.motivo-box textarea{width:100%;border:1.5px solid #FCA5A5;border-radius:8px;padding:9px;font-size:13px;display:none;resize:vertical;min-height:60px;margin-bottom:8px}
+.btn-confirmar-cancel{width:100%;background:#DC2626;color:white;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer}
+
+.result-screen{text-align:center;padding:20px}
+.result-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:36px;color:white}
+.result-icon.ok{background:linear-gradient(135deg,#40916C,#52B788)}
+.result-icon.cancel{background:linear-gradient(135deg,#DC2626,#EF4444)}
+.result-title{font-size:18px;font-weight:900;color:#1B4332;margin-bottom:8px}
+.result-msg{font-size:13px;color:#718096;line-height:1.6}
+
+.error-box{text-align:center;padding:30px 20px;color:#991B1B;font-size:13px;line-height:1.6}
+.footer-note{text-align:center;font-size:10.5px;color:#a0aec0;margin-top:18px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>🌟 AniCare Cleaning Service</h1>
+    <p>Confirmación de Cotización</p>
+  </div>
+  <div class="body" id="bodyContent">
+    <div class="loading"><div class="spinner"></div>Cargando tu cotización...</div>
+  </div>
+</div>
+
+<script>
+var SUPA_URL='https://tsajcvsgnxxnmhubrxmr.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M';
+var sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+var FORMSPREE_ID = 'xkolbvwv';
+
+var TOKEN = new URLSearchParams(window.location.search).get('t');
+var quoteData = null;
+
+function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function cargar(){
+  var body = document.getElementById('bodyContent');
+  if(!TOKEN){
+    body.innerHTML = '<div class="error-box">⚠️ Enlace inválido.<br>Falta el código de la cotización.</div>';
+    return;
+  }
+  try{
+    var {data, error} = await sb.rpc('obtener_cotizacion_publica', {p_token: TOKEN});
+    if(error) throw error;
+    if(!data || data.length===0){
+      body.innerHTML = '<div class="error-box">⚠️ No encontramos esta cotización.<br>El enlace puede haber expirado o ser incorrecto.</div>';
+      return;
+    }
+    quoteData = data[0];
+
+    if(quoteData.estado !== 'cotizado'){
+      var estadoTxt = {aprobada:'✅ Ya aprobaste esta cotización anteriormente. ¡Gracias!',
+                       pagada:'💰 Esta cotización ya fue pagada. ¡Gracias por confiar en AniCare!',
+                       cancelada:'❌ Esta cotización ya fue cancelada.',
+                       pendiente:'⏳ Esta cotización aún no tiene precio asignado.'}[quoteData.estado] || 'Esta cotización ya fue procesada.';
+      body.innerHTML = '<div class="error-box">'+estadoTxt+'</div>';
+      return;
+    }
+
+    renderQuote();
+  } catch(e){
+    body.innerHTML = '<div class="error-box">⚠️ Error al cargar la cotización.<br>Intenta de nuevo o contáctanos por WhatsApp.</div>';
+    console.error(e);
+  }
+}
+
+function renderQuote(){
+  var q = quoteData;
+  var h = '<div class="q-num">N° '+esc(q.numero_cot)+'</div>';
+  h += '<div class="q-client">Hola, '+esc(q.cliente_nombre)+' 👋</div>';
+
+  var servicios = q.servicios || [];
+  for(var i=0;i<servicios.length;i++){
+    var lines = servicios[i].split('\n');
+    var svcName = lines[0].replace(':','');
+    h += '<div class="svc-block"><div class="svc-name">'+esc(svcName)+'</div>';
+    for(var li=1;li<lines.length;li++){
+      if(!lines[li].trim()) continue;
+      h += '<div class="svc-item">'+esc(lines[li].replace(/^\s*\d+\.\s*/,''))+'</div>';
+    }
+    h += '</div>';
+  }
+
+  h += '<div class="totals">';
+  h += '<div class="t-row"><span>Subtotal</span><span>$'+(q.subtotal||0).toFixed(2)+'</span></div>';
+  if(q.descuento>0) h += '<div class="t-row"><span>Descuento</span><span>-$'+q.descuento.toFixed(2)+'</span></div>';
+  h += '<div class="t-row"><span>ITBMS (7%)</span><span>$'+(q.itbms||0).toFixed(2)+'</span></div>';
+  h += '<div class="t-row final"><span>TOTAL</span><span>$'+(q.total||0).toFixed(2)+'</span></div>';
+  h += '</div>';
+
+  h += '<div class="btns">';
+  h += '<button class="btn-aprobar" onclick="aprobar()">✅ Aprobar Cotización</button>';
+  h += '<button class="btn-cancelar" onclick="mostrarMotivo()">❌ No, gracias</button>';
+  h += '</div>';
+
+  h += '<div class="motivo-box" id="motivoBox">';
+  h += '<select id="motivoSelect" onchange="toggleMotivoOtro()">';
+  h += '<option value="">— ¿Por qué no continuarás? —</option>';
+  h += '<option value="Ya no necesito el servicio">Ya no necesito el servicio</option>';
+  h += '<option value="Elegí otro proveedor">Elegí otro proveedor</option>';
+  h += '<option value="El precio no se ajusta a mi presupuesto">El precio no se ajusta a mi presupuesto</option>';
+  h += '<option value="Prefiero reprogramar más adelante">Prefiero reprogramar más adelante</option>';
+  h += '<option value="Otro">Otro</option>';
+  h += '</select>';
+  h += '<textarea id="motivoOtro" placeholder="Cuéntanos brevemente..."></textarea>';
+  h += '<button class="btn-confirmar-cancel" onclick="confirmarCancelar()">Confirmar</button>';
+  h += '</div>';
+
+  h += '<div class="footer-note">AniCare Cleaning Service · Panamá<br>WhatsApp: +507 6317-1227</div>';
+
+  document.getElementById('bodyContent').innerHTML = h;
+}
+
+function mostrarMotivo(){
+  document.getElementById('motivoBox').style.display='block';
+}
+function toggleMotivoOtro(){
+  var sel = document.getElementById('motivoSelect').value;
+  document.getElementById('motivoOtro').style.display = sel==='Otro' ? 'block' : 'none';
+}
+
+async function notificarPorEmail(decision, motivo){
+  try{
+    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tipo:'cliente_respondio',
+        numCot:quoteData.numero_cot,
+        accion:decision==='aprobada'?'aprobar':'cancelar',
+        motivo:motivo||null,
+        cliente:{
+          nombre:quoteData.cliente_nombre,
+          telefono:quoteData.cliente_telefono||''
+        }
+      })
+    });
+  } catch(e){ console.warn('No se pudo notificar por email:', e); }
+}
+
+async function aprobar(){
+  var body = document.getElementById('bodyContent');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>Procesando...</div>';
+  try{
+    var {data, error} = await sb.rpc('responder_cotizacion', {p_token:TOKEN, p_decision:'aprobada', p_motivo:null});
+    if(error) throw error;
+    if(!data){
+      body.innerHTML = '<div class="error-box">⚠️ No se pudo procesar. Es posible que ya hayas respondido antes.</div>';
+      return;
+    }
+    notificarPorEmail('aprobada', null);
+    mostrarResultado(true);
+  } catch(e){
+    body.innerHTML = '<div class="error-box">⚠️ Error al procesar. Intenta de nuevo o contáctanos por WhatsApp.</div>';
+    console.error(e);
+  }
+}
+
+async function confirmarCancelar(){
+  var sel = document.getElementById('motivoSelect').value;
+  if(!sel){ alert('Por favor selecciona un motivo.'); return; }
+  var motivo = sel==='Otro' ? (document.getElementById('motivoOtro').value.trim()||'Otro') : sel;
+
+  var body = document.getElementById('bodyContent');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>Procesando...</div>';
+  try{
+    var {data, error} = await sb.rpc('responder_cotizacion', {p_token:TOKEN, p_decision:'cancelada', p_motivo:motivo});
+    if(error) throw error;
+    if(!data){
+      body.innerHTML = '<div class="error-box">⚠️ No se pudo procesar. Es posible que ya hayas respondido antes.</div>';
+      return;
+    }
+    notificarPorEmail('cancelada', motivo);
+    mostrarResultado(false);
+  } catch(e){
+    body.innerHTML = '<div class="error-box">⚠️ Error al procesar. Intenta de nuevo o contáctanos por WhatsApp.</div>';
+    console.error(e);
+  }
+}
+
+function mostrarResultado(aprobado){
+  var body = document.getElementById('bodyContent');
+  if(aprobado){
+    body.innerHTML = '<div class="result-screen">'+
+      '<div class="result-icon ok">✓</div>'+
+      '<div class="result-title">¡Gracias por confiar en nosotros!</div>'+
+      '<div class="result-msg">Hemos recibido tu aprobación para la cotización N° '+esc(quoteData.numero_cot)+'.<br><br>Nos pondremos en contacto contigo pronto para coordinar la fecha del servicio.</div>'+
+      '<div class="footer-note">AniCare Cleaning Service · Panamá<br>WhatsApp: +507 6317-1227</div>'+
+      '</div>';
+  } else {
+    body.innerHTML = '<div class="result-screen">'+
+      '<div class="result-icon cancel">✕</div>'+
+      '<div class="result-title">Entendido, gracias por avisarnos</div>'+
+      '<div class="result-msg">Hemos registrado tu respuesta para la cotización N° '+esc(quoteData.numero_cot)+'.<br><br>Si cambias de opinión, contáctanos cuando gustes.</div>'+
+      '<div class="footer-note">AniCare Cleaning Service · Panamá<br>WhatsApp: +507 6317-1227</div>'+
+      '</div>';
+  }
+}
+
+cargar();
+</script>
+</body>
+</html>

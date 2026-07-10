@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AniCare — Panel de Administrador</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh;color:#2d3748}
+
+/* LOGIN GATE */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:white;border-radius:20px;padding:36px 28px;max-width:380px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.12);text-align:center}
+.login-box .ico{font-size:44px;margin-bottom:12px}
+.login-box h1{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:6px}
+.login-box p{font-size:12px;color:#718096;margin-bottom:20px}
+.login-box input{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 14px;font-size:14px;margin-bottom:12px;outline:none;text-align:center;letter-spacing:2px}
+.login-box input:focus{border-color:#40916C}
+.login-box button.login-submit-btn{width:100%;background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
+.login-error{color:#e53e3e;font-size:12px;margin-top:8px;display:none}
+
+/* ADMIN APP */
+#adminApp{display:none}
+.topbar{background:linear-gradient(135deg,#1B4332,#2D6A4F);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+.topbar h1{color:white;font-size:15px;font-weight:800;flex:1}
+.topbar button{background:rgba(255,255,255,.15);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer}
+
+.tabs{display:flex;gap:0;background:white;border-bottom:2px solid #e2e8f0;padding:0 16px}
+.tab-btn{padding:13px 16px;font-size:13px;font-weight:700;color:#a0aec0;background:none;border:none;cursor:pointer;border-bottom:3px solid transparent}
+.tab-btn.active{color:#1B4332;border-bottom-color:#40916C}
+
+.page{max-width:900px;margin:0 auto;padding:16px}
+
+/* FILTERS */
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-chip{background:white;border:1.5px solid #e2e8f0;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;color:#4a5568}
+.filter-chip.active{background:#40916C;border-color:#40916C;color:white}
+
+/* === NUEVOS ESTADOS === */
+.status-aprobada{background:#C7F0DB;color:#0A5C36}
+.status-pagada{background:#2D6A4F;color:white}
+.status-cancelada{background:#FEE2E2;color:#991B1B}
+
+/* === ALERTA CLIENTE RECURRENTE (marcó Nuevo por error) === */
+.alerta-recurrente{background:#FFF3CD;border-left:3px solid #F59E0B;border-radius:0 8px 8px 0;padding:8px 12px;margin:8px 0;font-size:11px;color:#78350F;display:flex;align-items:center;gap:6px}
+
+/* === BOTONES DE ESTADO === */
+.estado-wrap{margin-top:14px;padding-top:14px;border-top:1px solid #f0f2f5}
+.btn-wa-send{width:100%;background:linear-gradient(135deg,#25D366,#1EBE57);color:white;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 3px 10px rgba(37,211,102,.3);transition:transform .15s,box-shadow .15s}
+.btn-wa-send:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(37,211,102,.4)}
+.estado-hint{font-size:10.5px;color:#a0aec0;text-align:center;margin-top:8px;line-height:1.5}
+.estado-btns{display:flex;gap:8px;margin-top:12px}
+.btn-estado{flex:1;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .15s,box-shadow .15s}
+.btn-estado:hover{transform:translateY(-1px)}
+.btn-aprobar{background:linear-gradient(135deg,#40916C,#52B788);color:white;box-shadow:0 3px 10px rgba(64,145,108,.25)}
+.btn-pagar{background:linear-gradient(135deg,#0F766E,#14B8A6);color:white;box-shadow:0 3px 10px rgba(15,118,110,.25)}
+.btn-cancelar{background:#E9C46A;color:#B91C1C;box-shadow:0 3px 10px rgba(233,196,106,.3)}
+.btn-cancelar:hover{filter:brightness(0.92)}
+.btn-cancelar:active{filter:brightness(0.85)}
+
+/* === MODAL MOTIVO CANCELACIÓN === */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-box{background:white;border-radius:16px;padding:22px;max-width:360px;width:100%}
+.modal-box h3{font-size:14px;color:#1B4332;margin-bottom:12px}
+.modal-box select{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px;font-size:13px;margin-bottom:10px}
+.modal-box textarea{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px;font-size:12px;margin-bottom:12px;display:none;resize:vertical;min-height:60px}
+.modal-btns{display:flex;gap:8px}
+.modal-btns button{flex:1;padding:10px;border-radius:9px;font-size:12px;font-weight:700;border:none;cursor:pointer}
+.btn-modal-cancelar{background:#f7f8fa;color:#4a5568}
+.btn-modal-confirmar{background:#DC2626;color:white}
+
+/* === EXPEDIENTE DE CLIENTE (timeline horizontal compacta) === */
+/* === LAYOUT DIVIDIDO: cotización a la izquierda, historial a la derecha === */
+.q-split{display:grid;grid-template-columns:1fr 330px;gap:0}
+@media(max-width:820px){.q-split{grid-template-columns:1fr}}
+.q-main{padding:16px}
+.q-side{background:#FAFCFA;border-left:2px solid #D8F3DC;padding:16px}
+@media(max-width:820px){.q-side{border-left:none;border-top:2px solid #D8F3DC}}
+.q-side-title{font-size:13px;font-weight:800;color:#1B4332;display:flex;align-items:center;gap:6px;margin-bottom:12px}
+
+/* Tarjeta de historial clickeable dentro del panel lateral */
+.tl-mini{background:white;border-radius:9px;padding:10px;box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:8px;cursor:pointer;border:1.5px solid transparent;transition:box-shadow .15s}
+.tl-mini:hover{box-shadow:0 3px 10px rgba(64,145,108,.15);border-color:#D8F3DC}
+.tl-mini.expanded{border-color:#40916C}
+.tl-mini .num-row{display:flex;align-items:center;justify-content:space-between}
+.tl-mini .num{font-size:12px;font-weight:800;color:#1B4332}
+.tl-mini .expand-ico{font-size:10px;color:#40916C;transition:transform .2s}
+.tl-mini.expanded .expand-ico{transform:rotate(90deg)}
+.tl-mini .fecha-mini{font-size:10.5px;color:#a0aec0}
+.tl-detail{display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #D8F3DC}
+.tl-mini.expanded .tl-detail{display:block}
+.tl-old-item{font-size:12px;color:#4a5568;padding:7px 0;border-bottom:1px solid #f7f9f8;display:flex;justify-content:space-between;gap:6px}
+.tl-old-item .svc-tag{font-size:10px;font-weight:800;color:#2D6A4F;display:block;margin-bottom:2px}
+.tl-old-item .price{font-weight:800;color:#1B4332;white-space:nowrap}
+.tl-old-total{display:flex;justify-content:space-between;font-size:12.5px;font-weight:800;color:#1B4332;margin-top:8px;padding-top:8px;border-top:1.5px solid #D8F3DC}
+
+.expediente{border:1.5px solid #D8F3DC;border-radius:12px;margin:10px 0;overflow:hidden;background:#FAFCFA}
+.expediente-head{background:linear-gradient(135deg,#F0FAF4,#E8F5EE);padding:9px 14px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.expediente-head .ico{font-size:14px}
+.expediente-head .txt{font-size:11.5px;font-weight:700;color:#1B4332;flex:1}
+.expediente-head .chev{font-size:12px;color:#40916C;font-weight:900;transition:transform .2s}
+.expediente-head.expanded .chev{transform:rotate(90deg)}
+.expediente-body{display:none;padding:8px 12px 12px}
+.expediente-body.show{display:block}
+
+.tl-card{background:white;border-radius:9px;padding:8px 12px;box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tl-card:last-child{margin-bottom:0}
+.tl-info{min-width:150px;flex-shrink:0}
+.tl-info .num{font-size:10.5px;font-weight:800;color:#1B4332;display:block}
+.tl-info .fecha{font-size:9.5px;color:#a0aec0}
+.tl-dots{display:flex;align-items:flex-start;flex:1;min-width:0;position:relative;justify-content:space-between}
+.tl-item{display:flex;flex-direction:column;align-items:center;position:relative;flex:1;min-width:0}
+.tl-item:not(:last-child)::after{content:'';position:absolute;top:3.5px;left:calc(50% + 6px);right:calc(-50% + 6px);height:2px;background:#e2e8f0;z-index:0}
+.tl-dot{width:8px;height:8px;border-radius:50%;background:#40916C;border:1.5px solid white;box-shadow:0 0 0 1.5px #40916C;z-index:1;margin-bottom:2px;flex-shrink:0}
+.tl-dot.cancel{background:#DC2626;box-shadow:0 0 0 1.5px #DC2626}
+.tl-lbl{font-size:9.5px;font-weight:700;color:#1B4332;white-space:nowrap;line-height:1.3;text-align:center}
+.tl-lbl.cancel{color:#991B1B}
+.tl-fecha-sm{font-size:8.5px;color:#a0aec0;white-space:nowrap}
+.tl-badge{font-size:11px;font-weight:800;padding:4px 10px;border-radius:14px;white-space:nowrap;flex-shrink:0}
+.tl-motivo{font-size:10.5px;color:#991B1B;width:100%;margin-top:4px}
+
+/* === DIRECTORIO — estilo directorio telefónico === */
+.dir-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.dir-search{flex:1;min-width:180px;border:1.5px solid #e2e8f0;border-radius:10px;padding:9px 12px;font-size:12px}
+
+.dir-letra-group{margin-bottom:10px;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden}
+.dir-letra-header{background:linear-gradient(135deg,#F0FAF4,#E8F5EE);padding:10px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.dir-letra-badge{width:26px;height:26px;border-radius:50%;background:#40916C;color:white;font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dir-letra-count{font-size:11px;color:#718096;flex:1}
+.dir-letra-chev{color:#40916C;font-weight:900;font-size:13px}
+.dir-letra-body{display:none}
+.dir-letra-body.show{display:block}
+
+.dir-entry{border-bottom:1px solid #f0f2f5}
+.dir-entry:last-child{border-bottom:none}
+.dir-entry-name{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;font-size:13px;font-weight:700;color:#1B4332}
+.dir-entry-name:hover{background:#FAFCFA}
+.dir-entry-chev{color:#a0aec0;font-size:12px}
+.dir-entry-body{display:none;padding:0 16px 14px}
+.dir-entry-body.show{display:block}
+.dir-entry-body .dir-sub{font-size:10.5px;color:#a0aec0;margin-bottom:8px}
+.dir-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#4a5568;padding:3px 0}
+.dir-row .ico{font-size:12px;width:16px}
+.dir-stats{display:flex;gap:6px;margin-top:10px}
+.dir-stat{flex:1;background:#F7FAF8;border-radius:8px;padding:6px;text-align:center}
+.dir-stat .n{font-size:14px;font-weight:900;color:#2D6A4F}
+.dir-stat .l{font-size:8px;color:#718096}
+
+
+/* QUOTE CARD */
+.q-card{background:white;border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06);border:2px solid #e2e8f0}
+.q-card.cotizado{border-color:#95D5B2}
+.q-head{padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.q-num{font-size:11px;font-weight:800;color:#40916C;background:#F0FAF4;padding:3px 8px;border-radius:6px}
+.q-name{font-size:14px;font-weight:800;color:#1B4332;flex:1}
+.q-date{font-size:11px;color:#a0aec0}
+.q-status{font-size:10px;font-weight:800;padding:4px 10px;border-radius:10px}
+.status-pendiente{background:#FFF3CD;color:#78350F}
+.status-cotizado{background:#FED7AA;color:#9A3412}
+.status-cotizado.vencido{background:#FCA5A5;color:#7F1D1D}
+.q-chevron{font-size:16px;color:#40916C;transition:transform .2s}
+.q-card.open .q-chevron{transform:rotate(180deg)}
+.q-body{display:none;border-top:1px solid #f0f2f5;padding:16px}
+.q-card.open .q-body{display:block}
+
+.client-info{background:#F7F8FA;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.8}
+.client-info b{color:#1B4332}
+
+.price-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5}
+.price-row:last-child{border-bottom:none}
+.price-info{flex:1;font-size:12px;color:#4a5568;line-height:1.5}
+.price-info .svc-tag{font-size:10px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px}
+.price-input-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.price-input-wrap span{font-size:13px;color:#718096}
+.price-input{width:80px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 8px;font-size:13px;text-align:right;outline:none}
+.price-input:focus{border-color:#40916C}
+
+.totals-box{background:#F0FAF4;border-radius:10px;padding:14px 16px;margin-top:14px}
+.total-line{display:flex;justify-content:space-between;font-size:13px;color:#2D6A4F;padding:4px 0}
+.total-line.final{font-size:16px;font-weight:800;color:#1B4332;border-top:2px solid #D8F3DC;margin-top:6px;padding-top:8px}
+.discount-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.discount-row input{width:90px;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 8px;font-size:12px;text-align:right}
+
+.btn-row{display:flex;gap:8px;margin-top:14px}
+.btn-save{flex:1;background:#40916C;color:white;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-pdf{flex:1;background:linear-gradient(135deg,#E29578,#D97C5F);color:white;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.estado-btns-3{display:flex;gap:8px;margin-top:12px}
+.estado-btns-3 .btn-estado{flex:1}
+.btn-wa-inline{background:#64748B;color:white}
+.btn-pdf-inline{background:linear-gradient(135deg,#E29578,#D97C5F);color:white}
+.btn-modificar{width:100%;background:#475569;color:white;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px}
+.btn-modificar:hover{filter:brightness(0.92)}
+.btn-modificar:active{filter:brightness(0.85)}
+
+.empty-state{text-align:center;padding:60px 20px;color:#a0aec0}
+.empty-state .ico{font-size:48px;margin-bottom:14px}
+
+/* SETTINGS TAB */
+.settings-row{display:flex;align-items:center;gap:12px;background:white;border-radius:12px;padding:12px 16px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.settings-row .name{flex:1;font-size:13px;font-weight:700;color:#1B4332}
+.settings-row .unidad{font-size:11px;color:#a0aec0}
+.settings-row input{width:90px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 8px;font-size:13px;text-align:right}
+.save-settings-btn{width:100%;background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px}
+
+.loading{text-align:center;padding:40px;color:#a0aec0;font-size:13px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1B4332;color:white;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;display:none;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+
+/* === GESTIÓN DE PRECIOS — TARJETAS COLAPSABLES === */
+.precios-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.precios-toolbar .desc{font-size:12px;color:#718096}
+.btn-toggle-all{background:#F0FAF4;border:1.5px solid #D8F3DC;color:#2D6A4F;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer}
+.btn-toggle-all:hover{background:#D8F3DC}
+
+.precios-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.precios-grid{grid-template-columns:1fr}}
+
+.precio-svc{border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;height:fit-content}
+.precio-svc.expanded{grid-column:1/-1}
+
+.precio-svc-head{background:linear-gradient(135deg,#F0FAF4,#E8F5EE);padding:11px 14px;display:flex;align-items:center;gap:10px;border-bottom:2px solid #D8F3DC;cursor:pointer;user-select:none}
+.precio-svc-head .ico{font-size:18px;flex-shrink:0}
+.precio-svc-head .info{flex:1;min-width:0}
+.precio-svc-head .nom{font-size:13px;font-weight:800;color:#1B4332}
+.precio-svc-head .pend{font-size:10.5px;font-weight:700;margin-top:2px}
+.precio-svc-head .pend.ok{color:#2D6A4F}
+.precio-svc-head .pend.warn{color:#B45309}
+.precio-svc-head .chev{font-size:14px;color:#40916C;font-weight:900;transition:transform .2s;flex-shrink:0}
+.precio-svc.expanded .precio-svc-head .chev{transform:rotate(90deg)}
+
+.precio-table-wrap{max-height:380px;overflow-y:auto;display:none}
+.precio-svc.expanded .precio-table-wrap{display:block}
+.precio-table{width:100%;border-collapse:collapse}
+.precio-table thead{position:sticky;top:0;z-index:2}
+.precio-table thead tr{background:#F7F9F8}
+.precio-table thead th{padding:7px 14px;font-size:10px;font-weight:800;color:#718096;text-transform:uppercase;letter-spacing:.5px;text-align:left;border-bottom:1px solid #e2e8f0;background:#F7F9F8}
+.precio-table thead th:last-child{text-align:right;width:120px}
+.precio-table tbody tr{border-bottom:1px solid #f0f2f5}
+.precio-table tbody tr:last-child{border-bottom:none}
+.precio-table tbody tr:hover{background:#FAFCFA}
+.precio-table tbody td{padding:8px 14px;font-size:12px;color:#4a5568;vertical-align:middle}
+.precio-table tbody td:last-child{text-align:right}
+.pcell{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+.pcell span{color:#a0aec0;font-size:12px}
+.pcell input{width:72px;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:12px;text-align:right;outline:none}
+.pcell input:focus{border-color:#40916C}
+.pcell input.has-val{border-color:#95D5B2;color:#1B4332;font-weight:700;background:#F0FAF4}
+.nota-manual{background:#FFF8E1;border-left:3px solid #F59E0B;border-radius:0 8px 8px 0;padding:12px 14px;margin:12px 14px;font-size:12px;color:#78350F;line-height:1.6}
+
+.pw-wrap{position:relative;margin-bottom:12px}
+.pw-wrap input{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 44px 12px 14px;font-size:14px;margin-bottom:0;outline:none;text-align:center;letter-spacing:2px;box-sizing:border-box}
+.pw-wrap input:focus{border-color:#40916C}
+.pw-eye{position:absolute!important;right:12px!important;top:50%!important;transform:translateY(-50%)!important;width:auto!important;background:none!important;border:none!important;padding:4px!important;margin:0!important;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#9aa0a6;transition:color .15s;border-radius:0!important}
+.pw-eye:hover{color:#40916C}
+.pw-eye svg{width:20px;height:20px;display:block}
+</style>
+</head>
+<body>
+
+<!-- LOGIN GATE -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="ico">🔐</div>
+    <h1>Panel de Administrador</h1>
+    <p>AniCare Cleaning Service</p>
+    <div class="pw-wrap">
+      <input type="password" id="pwInput" placeholder="••••••••" maxlength="30" onkeypress="if(event.key==='Enter')intentarLogin()">
+      <button type="button" class="pw-eye" onclick="togglePwVis()" id="pwEye" title="Ver contraseña">
+        <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+        </svg>
+      </button>
+    </div>
+    <button class="login-submit-btn" onclick="intentarLogin()">Ingresar</button>
+    <div class="login-error" id="loginError">Contraseña incorrecta</div>
+  </div>
+</div>
+
+<!-- ADMIN APP -->
+<div id="adminApp">
+  <div class="topbar">
+    <h1>⚙️ Panel de Administrador — AniCare</h1>
+    <button onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabCot" onclick="cambiarTab('cotizaciones')">📋 Cotizaciones</button>
+    <button class="tab-btn" id="tabPrecios" onclick="cambiarTab('precios')">💲 Gestión de Precios</button>
+    <button class="tab-btn" id="tabDirectorio" onclick="cambiarTab('directorio')">📇 Directorio</button>
+  </div>
+
+  <div class="page" id="viewCotizaciones">
+    <div class="filters" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="filter-chip active" data-estado="pendiente" onclick="filtrarEstado(this,'pendiente')">Pendientes</div>
+        <div class="filter-chip" data-estado="cotizado" onclick="filtrarEstado(this,'cotizado')">⏳ Esperando Respuesta</div>
+        <div class="filter-chip" data-estado="aprobada" onclick="filtrarEstado(this,'aprobada')">✅ Aprobadas</div>
+        <div class="filter-chip" data-estado="pagada" onclick="filtrarEstado(this,'pagada')">💰 Pagadas</div>
+        <div class="filter-chip" data-estado="cancelada" onclick="filtrarEstado(this,'cancelada')">❌ Orden Eliminada</div>
+      </div>
+      <button onclick="exportarExcel()" style="background:#1D6F42;color:white;border:none;border-radius:9px;padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap">📊 Generar Excel</button>
+    </div>
+    <div id="cotList"><div class="loading">Cargando cotizaciones…</div></div>
+  </div>
+
+  <div class="page" id="viewPrecios" style="display:none">
+    <div class="precios-toolbar">
+      <span class="desc">Toca un servicio para ver y editar sus precios. Los campos en verde ya tienen precio asignado.</span>
+      <button class="btn-toggle-all" onclick="toggleTodosServicios()" id="btnToggleAll">▾ Expandir todos</button>
+    </div>
+    <div id="preciosTablaCompleta"><div class="loading">Cargando precios…</div></div>
+    <button class="save-settings-btn" onclick="guardarTodosPrecios()" style="background:linear-gradient(135deg,#2D6A4F,#40916C);margin-top:8px">💾 Guardar Todos los Precios</button>
+  </div>
+
+  <div class="page" id="viewDirectorio" style="display:none">
+    <div class="dir-toolbar">
+      <input type="text" class="dir-search" id="dirSearch" placeholder="🔍 Buscar por nombre, teléfono o RUC..." oninput="renderDirectorio()">
+    </div>
+    <div id="directorioLista"><div class="loading">Cargando directorio…</div></div>
+  </div>
+</div>
+
+<!-- MODAL: Motivo de cancelación -->
+<div class="modal-overlay" id="modalCancelar">
+  <div class="modal-box">
+    <h3>❌ Cancelar Cotización</h3>
+    <select id="motivoCancelSelect" onchange="toggleMotivoOtro()">
+      <option value="">— Selecciona un motivo —</option>
+      <option value="Cliente ya no lo necesita">Cliente ya no lo necesita</option>
+      <option value="Eligió otro proveedor">Eligió otro proveedor</option>
+      <option value="Problema de presupuesto">Problema de presupuesto</option>
+      <option value="Reprogramó para después">Reprogramó para después</option>
+      <option value="No respondió">No respondió</option>
+      <option value="Otro">Otro (especificar)</option>
+    </select>
+    <textarea id="motivoCancelOtro" placeholder="Especifique el motivo..."></textarea>
+    <div class="modal-btns">
+      <button class="btn-modal-cancelar" onclick="cerrarModalCancelar()">Cancelar</button>
+      <button class="btn-modal-confirmar" onclick="confirmarCancelacion()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== CONFIG =====================
+var TIPOS_MAP={"alfombras": {"nombre": "Alfombras o Moquetas", "tipos": ["Alfombra (General)", "Alfombra Bucle (Bereber/Boucle)", "Alfombra de Fibra Natural", "Alfombra en Rollo (pared a pared)", "Alfombra Pelo Corto (Texturizadas/Frisé)", "Alfombra Pelo Largo (Shaggy)", "Alfombras Modulares (Cuadrados precortados)"]}, "colchones": {"nombre": "Colchones", "tipos": ["Colchón", "Cama", "Box de Cama", "Respaldar"]}, "comercial": {"nombre": "Limpieza Comercial", "tipos": ["Bodega", "Clínica", "Edificio", "Empresa", "Iglesia", "Oficina", "Restaurante", "Tienda"]}, "hogar": {"nombre": "Limpieza Hogar", "tipos": ["Limpieza Profunda"]}, "persianas": {"nombre": "Persianas y Cortinas", "tipos": ["Cortina de Madera", "Cortina de PVC", "Cortina Double Shade", "Cortina Roller", "Cortina Roller Black-out", "Persianas"]}, "pisos": {"nombre": "Pisos y Superficies", "tipos": ["Baldosa", "Cerámica", "Granito", "Mármol", "Porcelanato", "Terrazo", "Vinilo"]}, "pulido": {"nombre": "Pulido de Pisos", "tipos": ["Granito", "Mármol", "Terrazo"]}, "electro": {"nombre": "Servicios Adicionales de Limpieza", "tipos": ["Campana", "Freidora de aire", "Horno pequeño", "Limpieza de piso con máquina rotativa", "Microondas", "Refrigeradora"]}, "sofas": {"nombre": "Sofás y Muebles", "tipos": ["Butaca", "Poltrona", "Puff", "Silla de comedor", "Sofá o Sillón 1 puesto", "Sofá de 2 puestos", "Sofá de 3 puestos", "Sofá en L (3+2 puestos)", "Sofá en L (6 puestos)", "Sofá Cama", "Sofá Diván", "Sofá Ergonómico (reclinable y asiento extensible)", "Sofá Futón", "Sofá Modular", "Otros"]}};
+
+// Configuración de campos por servicio — igual criterio que el formulario del cliente
+var SVC_CAMPOS={
+  colchones:{hasCant:true,hasTamañoModelo:true,hasNivel:true,
+    tamaños:['Twin Individual (90 cm x 190 cm)','Twin XL (99 cm x 203 cm)','Full (135 cm x 190 cm)','Matrimonial (140 cm x 190 cm)','Queen Size (150 cm x 203 cm)','King Size (190 cm x 200 cm)','California King (183 cm x 213 cm)']},
+  persianas:{hasCant:true,hasMedidas:true,hasUbicacion:true,hasTelColor:true,hasNivel:true,
+    ubicaciones:['Sala','Comedor','Habitación','Habitación Principal','Otros'],
+    colores:['Blanco','Blanco Roto / Off White','Crema / Marfil','Beige / Arena']},
+  sofas:{hasCant:true,hasPuestos:true,hasNivel:true,
+    puestos:['1 puesto','2 puestos','3 puestos','3+2 puestos','6 puestos','Otro (especificar)']},
+  pisos:{hasArea:true,hasNivel:true},
+  pulido:{hasArea:true,hasNivel:true},
+  alfombras:{hasArea:true,hasForma:true,hasNivel:true,
+    formas:['Circular','Cuadrada','Rectangular','Runner']},
+  electro:{hasCant:true,hasNivel:true},
+  hogar:{hasArea:true,hasNivel:true},
+  comercial:{hasArea:true,hasLimpType:true,hasNivel:true}
+};
+var NIVELES_SUCIEDAD=['Limpio','Leve','Moderado','Alto','Severo'];
+var NIVEL_COLORES=['#48bb78','#9ae65e','#ecc94b','#ed8936','#e53e3e'];
+
+// Medidas exactas por tipo de Persiana — deben coincidir EXACTO con Gestión de Precios
+// para que el precio por m² se encuentre correctamente (si no coincide, no hay match).
+var MEDIDAS_PERSIANAS={
+  'Cortina de Madera':['60 x 120 cm','90 x 150 cm','120 x 180 cm','150 x 200 cm'],
+  'Cortina de PVC':['60 x 120 cm','90 x 150 cm','120 x 180 cm','150 x 200 cm'],
+  'Cortina Double Shade':['90 x 150 cm','120 x 180 cm','150 x 200 cm','200 x 250 cm'],
+  'Cortina Roller':['90 x 150 cm','120 x 180 cm','150 x 200 cm','200 x 250 cm'],
+  'Cortina Roller Black-out':['90 x 150 cm','120 x 180 cm','150 x 200 cm'],
+  'Persianas':['90 x 150 cm','120 x 180 cm','150 x 200 cm']
+};
+var MEDIDAS_COLCHON=["Twin Individual (90 cm x 190 cm)","Twin XL (99 cm x 203 cm)","Full (135 cm x 190 cm)","Matrimonial (140 cm x 190 cm)","Queen Size (150 cm x 203 cm)","King Size (190 cm x 200 cm)","California King (183 cm x 213 cm)"];
+var SUPABASE_URL='https://tsajcvsgnxxnmhubrxmr.supabase.co';
+var SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M';
+var sb=null;
+function getSupa(){ if(!sb && window.supabase){ sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY); } return sb; }
+
+
+var EYE_OPEN='<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
+var EYE_OFF='<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>';
+function togglePwVis(){
+  var inp=document.getElementById('pwInput');
+  var icon=document.getElementById('eyeIcon');
+  if(inp.type==='password'){
+    inp.type='text';
+    inp.style.letterSpacing='normal';
+    icon.innerHTML=EYE_OFF;
+  } else {
+    inp.type='password';
+    inp.style.letterSpacing='2px';
+    icon.innerHTML=EYE_OPEN;
+  }
+  inp.focus();
+}
+// Login real con Supabase Auth — email fijo de administrador, solo se pide contraseña
+var ADMIN_EMAIL='cleaningserviceani@gmail.com';
+
+async function intentarLogin(){
+  var pw=document.getElementById('pwInput').value;
+  var btn=document.querySelector('.login-box button');
+  btn.textContent='Verificando…'; btn.disabled=true;
+  try{
+    var s=getSupa();
+    var {data,error}=await s.auth.signInWithPassword({email:ADMIN_EMAIL,password:pw});
+    if(error) throw error;
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('adminApp').style.display='block';
+    cargarCotizaciones();
+  } catch(e){
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('pwInput').value='';
+  } finally{
+    btn.textContent='Ingresar'; btn.disabled=false;
+  }
+}
+
+async function cerrarSesion(){
+  var s=getSupa();
+  await s.auth.signOut();
+  location.reload();
+}
+
+window.onload=async function(){
+  var s=getSupa();
+  var {data}=await s.auth.getSession();
+  if(data&&data.session){
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('adminApp').style.display='block';
+    cargarCotizaciones();
+  }
+};
+
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.display='block';
+  setTimeout(function(){t.style.display='none';},2500);
+}
+
+function cambiarTab(tab){
+  document.getElementById('tabCot').classList.toggle('active',tab==='cotizaciones');
+  document.getElementById('tabPrecios').classList.toggle('active',tab==='precios');
+  document.getElementById('tabDirectorio').classList.toggle('active',tab==='directorio');
+  document.getElementById('viewCotizaciones').style.display=tab==='cotizaciones'?'block':'none';
+  document.getElementById('viewPrecios').style.display=tab==='precios'?'block':'none';
+  document.getElementById('viewDirectorio').style.display=tab==='directorio'?'block':'none';
+  if(tab==='precios'){ cargarTodosPrecios(); }
+  if(tab==='directorio'){ renderDirectorio(); }
+}
+
+// ===================== COTIZACIONES =====================
+// ⚠️ AJUSTA ESTA URL cuando publiques en GitHub Pages — debe apuntar a donde
+// subas AniCare_Aprobar_Cotizacion.html (ej: https://ani3012v.github.io/NOMBRE-REPO/)
+var GITHUB_BASE_URL = 'https://ani3012v.github.io/Cotizacion-AniCare/';
+var LOGO_BASE64='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAACKCAIAAACfLeBlAAAQAElEQVR4AexdB2AcxdWe2d3r/dQly5ZkuUmyZFs2Ni600HtPCCWhhhYCoYTeCYQQQoAAoRkwnVBD72AbG3dbbpIsWZYtq+t6v9v9v9m9O51kGVyAkF+7vJt98+bNm9l377s3O2NsTlIv1QOqB/6rHuCIeqkeUD3wX/WACsL/qvvVwVUPEKKCUI0C1QP/ZQ+oIPwvfwE/4fDqUD9TD6gg/Jl+Meq0ho8HVBAOn+9afdKfqQdUEP5Mv5ifclpD7s//lBMY5mOpIPzfDoAh8SNJe/JQ6ARK99wzI+nuKrPrHvgRQLjrg6uae+eBTMwMtLRLCIKSTEkzCYnExAFmkg0DZGrlh/eACsIf3qc/nUVgKDUYAANK1QjJaOoXZnBIoVCSiaAjqDMY3+SNZsBQ+l4jGfZUds89oIJwz3338+kZl6SOYKI7nNizKVFCRIlsDcQ3uKLg98yI2muPPaCCcI9d93PpiGWkNyp92x1e2xeNit+XAXeYNeDnj0mt/tjynshaV3SrP+6PiXFkxh00VcGP5AEVhD+SY386s8DMt13hj7cFP20LrndFIwDlUIMDVliCpimt4ouJi7tCb7YEPtgaWNARfrHJN78j3BfeiZV0N4VRyx/CAyoIfwgv/ldtmARa7dTOzNPvk6svt2o0O3ylCvB29oJn1nBTc/THl5gPHWGcmaf7ZZl5Rq7eruOVdanSN7P8rz7r/8/Bd/jG/n8+5v/eU7HERQCczPgfzCtPJXA0x8ADObXZOpOG46kCH6VxcAmzSH3ujP0XnhKrlis2CZOzdNVOXYlFY9dx2p3HBSYx2Kha3zsP7NzZe2dX7b27HgA88D4nE+Jc3plEBTjcBdJwdLRFM8IoZA7KrLBPvwxDYLFa1xdZ1h3GaYRsnrUiCADFEotQ6dBSQkBk4IWOoIEytfaDeQD+/8FsqYb2zAMMKQAESD4sQLiDZZRhjgllNGbI+lnWSlnntIh1B5BZHY3shk8wLjX7Yl+0h7/uCDV5o6GM9z6OkiKjZoxNC7UdyRMVQf2GdtRQJXvhgf8NEO7FA/7vdWWJCB8QIVFRwtKxLRDf5Ilh83N5d2RxV3hBR+jr9tD8jtDCjjC2ZFb2RNa5olBoC8Z7wwlAC2gB4cllG1jTMkIVaI8mJKNADTwHACo6kCsEHCIfKnxmie3TBk+0yRsDo8hhRyalppZ76wEVhHvrwb3pL+erAViIiwSoa/XH6/qiQNobm/3zGr3PNvqervc8We95YqPnkfWeh9Z57q9z/3mV69YVvTcs7b1uac9Ny3pvW9H755V9f1vjfmSd59VmP7Da5Iv1ReTDBmARRIhJ4KqcukOKjIeNMGLliR2d75g8pgXUYYYAX7Mvjh8CVBVK9WJITPHqfc89oIJwz323Nz0R3Ajh9AKTRTwhSGLbg/EWX6wnHI+LkkGghUahyqHbN1d/cJHxqGIT9jBPKTX/arT59HLLr8rMx4wyzcrXjzJrMJMWX3xBR/i1zf5HN3j+shr47Lt1ed+fV/X9a4Pn8+0hnP7hJZBQglxXYhbG2jQYEURSF01dKQF0CQV0KQkmpM3eGI7ykZYhAaV1VOYH8YAKwh/EjbtqBMBTSIEfYIDcghLRjm9Cy9EsPV9i0Ti0fDghbQ8kmnyx9e4ojtGR2YAxLETBLO+JbnRHOwBZiQCls/P1wOSV1Y5rJzkuqrDhpMGu5XD4Pr8j9NaWwOMbvLct77t2Sc+dK/ve3hLoCYs4kwBhxuyHADeZ5FnJXKpoDyXebQ08tsH719UuwPjdLYF7V/fNbfAu7gz7Y5hySk+977UH8NXvtQ3VwHd6gMW6HOMoFEWEMMMeboT9eTHsWCIB4qj98Y2eu1b2/WFR90ULu69Y3HPT8t77sLxc73m63vtik//1zf63WgI4Vcca9eVm/3MNvsc3eh9c57lvjefvde6n6j2ftoV6w4lSi+akEtMfquxnjrGMlzNeezAO3CJJ3rq896IFXfeuduFNMhjDvNi7Im7yRDA1TDDFEiJQouOonif4gcAvAhoEjmLa4OPoA/Ufh4ahVW4YPvNP9siIVcQ1kbctEcQKiYQBD0u7vqi4tCsC4F25uOfMLzovX9T7tzoPXucWdUZa/HFvVIzL25vAQHIFSAkYbJ+A8AgSRUFgOyZKePdr9MQXdIZebvI/tsGD9PXOlkAwLk3PMZxYajpqpKnMKmgoxekgziee2Oi9dGH3ld92v7nZvy0Qj4hsjpibbK6/yNbzvygynlFuvazKfkgR7JivqHL8Zox1vwKDTauGTb+j9p5Tvbn3PhzCAmKahTYgIjeiyliJJEQJyQr7mc83+q5f0nPhwq6/1bk/2BpsDSQShGg5quU5DUf0HLFouWwdjzP00VZhvF1T5dBOy9Htl89eDo8oNh47ynTcKNPhI4wHFhpwRj/Gqsk38jYtj156ngPY6j2x11v88zZ5P9oWdEUTE+zaGXm6CXaNVcvpeeqLS59sCyHT/mlJzytNvi3+GDaE8JMhTzZZAOMgnhKLhkN2LTDw6IgqhKCkknr7ITyggvCH8OJAGwx+qYgG/EBoTxBpSyD+UVvwH2vd1y1F0nN/sj3kj0k6ntMLAB4LbHREWoIyx1F8MeBDCdEVFTtDCeyL4JAA0Gr0RLEH0xGMh+KiWeDG2rQHFRpOLTOfP856wXjrr0ebDy82TM7W4l0R4KGUdoUS89vDgOJ6V1TH0zKrpsAoWDWcQaASoUu6I/eucd+xou+DrQG8BGLWjDADmZByQRqOlls1I80CzxFUQXIjJgzzKOWaWuyFB/Bd70VvtesOHgCQ0jJJ5hCnrf742y2Be1b13bnShXczrDbRgpSFsAbSsJ7E6jQOjhCeEqNAARIQ9lecOj5HL+QZUPJmgcMrWW9ErPdEF3SE320Nvtjkw+IThxbPb/J9tj2Ed79cg7BfvuGC8barq+1nlFv2y9cjlyKDRROkPZhY0RNp9sbikgTLgKiWI4AlDgznd4TvXuXCrwMWtF62i0ok0n8JHBlr12C7iKZkDHyUrY1TAvW+Vx4YtiDcK68N2ZnlEHzkNtyVOMbi8/2tQZwZ3Ffnxh5jb1jkKUVuQWs0IUYTEk+xw8nXZukOG2E4bbT5kgrbn2ocN0123lrrvH1q1m21WbfXOpXyzqlZdzBy3jzZeWW1/bdjLUeONE7K0pk0bC/0i+2hZxt8D651P7zOA3DiWG9Kth5ovHGy8+xx1tocLVCHNacnKgKN2FmNShKPpIZ5ECJwFG+V/2kNAIrPNHhxRiLidVRuwtNQQrJ0vA2QRUWlH8ED3I9gcziaBOrYJon86Cx6KQHAcLSAU3Ug8MvtIUQ5Yp3n2F8hEY6LOo6Ot2uOHWkC5O6eBrA5wVxaaQdgTiwxH1xk2DdPPzlLN9GhrbBrK+3aaqduSrYOpxGHFhlPLDX/dqz1kgr7NdUOYPXefbJunuI8o9w8NUen5SlWrdgm/ddG799Wu3Ci0B6KHzrCeONk53WTHNhTMQocdmKQeINxKYKcmJowpWy7qNkbf67RBygu7AzFMh9JVlOLH8kDKgh/AMdmhityCFJHXyTxTKPvpmV92KXEGx12MnlKIgkpLkojTPzxJaY7pznvn5GDkz28zgFv42yaIqPg1LJdk2R+kgjsDCJlrjCFFSaWlHjxG2PT7JOrB26vmGi/d3rW32dkI5dOy9aJolTviWGNikXmLct6P9wWrHBogdU7pzr3ycEilMQSbNaYmGIzWVISiEsLOsM46H+l2R+X58D0ks3q7UfxgArCvXKrJF+ESIoVIBBJBufpf1zc+/Bat7KuA5AACZwQ7Juru2WK48k5uVheHlFsAn5y9DxyFxTQnZXsA1aGHyXIToOJNbIPJXIrSnlkDU/tOva/I83I1V9caXtsTs7Ds3JOLjPl6rlATNrojj290XPxgq5nG7wY9N59sgFF7KkCzJg4TJGBF1C3PZjAGf2dK/p6wgmcqciD9CvJDy3hHVZh0mW/hsrtjge43VFWdQd4AMGXriNMQdjVeKnJ9/tvuhfirQt1GZ3YaJmdb/jbjKxHZueeXm4dbdWYBKr4HUlPYZJgIyQFCbrjJTeiHURw4UYpYURYWmtwx7b445DrOIpXOKw875qW9fic3PPHW0txSMjTrnDiuUbv+V93v9Hir83W/3V6Nl4syywCoEgJAZHUJU+cIA3iWa5b2rvWFcHSGr8vqfbkHY8PSlZ+1ref++SUGPi5z/JnOL/M+EPUgrAXgo1KnPt5oxLyGyRmDd03V3/9JMd907Nx8G3RcEgykDPs0WTc06GvIZ6YokuSqHIpSnFJwpn7F+0hbH4GsPciSzEKtn8m2LWXVtow+lljrKMtAD/XEUxgQ/Wqb3uQro8sNt05NevokSZMDOlO7tdfAHUcpV93hPCKuKgrHMbyFUbldtzjUqIn6u2OehPSjl1lJbXYZQ+oINxlV+1EEREJanTH/l7nxrYkdvwpJXArAIDNyVtqnceXmB06Bj9CCEeT2CPsTnGRvb6Alt6I2BVKgLxYDcsGOcIGAOYBRbwNXlphu3mKE3jL0rOWlb0R/Fg8uM6N2eJl8pJKW4lZoGTwhefiCF3VE8Gm65ftoWAC9rCAxUJUbPS1/23D2++3LY+xP9gD4eC+an3XPcDtuqqqmfZAOg0iTBGY9e7oP9d7cCAOPIDwenZCiQm7kaeXW0aasSfKYjQDfooZuSsM7QXBEKwAZlUO7ZHF7E/PFJjYcJCDACpKk1BEZsb+DfD2h4l27LhqOeqKiG+2BP66xjW/I3T8KNNV1Y5Z+XoNx6ZK0TlFsE8pXeuKfdYWwvEG3gNBmwNdf13/5ldd67J1Vp7joZvZBVWVdssDKgh3y11MGahhN/l9D8wmbwyrUCQKZBW8O422CH+ssuOwAQcGBjm7IEBB0CQMESR9Ib73mpIGsN1Z5dSWyP9zRGoskr6Af4XP1vMnlZiuqXEcOwpLUIotl9V90QfWuuc1+mqytIDoSaVmi4ZifZk2AgY/K9jOOaDQYNVSVLvD3rvWvrast+HSMUcemDcRr7cQKvbVcs88oIJw9/yGvKd0QPgj+LCL+OgGD97HoqKUkKRZeXoc3B03yoRtT7QqpOijZCGMW4qU1r0rYZIRNleMAlUwnzKfvIfiUk84EU2wwwiMJVCK48ffV9ovnGDLN/J4nJ6wiOPEf67zmATuogm288dZs/UcgAdlmAAgi808dncOLNAbeRqIh+9c9+qbW+aPsxUfXjjZKOigo9JeekAF4W44UM6BQF+yizsq/msDW4XizA0LOZz43TjFOTVbjwODdPJJqgIpyJwI+WSdJCSxLdiLM/y9oS2Brs2BTlBf1IdpgVLm2R2jAUu9kcSavqgrKoKHAibCc6TAwP+63HJtjWO8XSMRKZSQsGX6tzUudzTx63LrFVX2IhPPlAnJM3AXV9gOKTIYBeqPh26te/mF5s/hh7GWIofWzIYhCloJpUlGFqrFbnhAfFRgfAAAEABJREFUBeGuOgsxnVYFjwwzt977WrMffI6Bx87H5VX2MuwzUjLQpxQXgRJJXghuhXt966L9Pr1h1sfXztgT+tP0j6/Z9+PrZsl0zFd3fbh9RQx7JKmBMAqSGI4ZkAbXu6MoE0AbpIQAK5QSA08PLjLcMy1rdp4BnQBRvPXdtdJV74li/+b22qxyqyZLx1090YGqnqfdEc+Na154etNHUTFx9MiZF405nKccM0XkC5x8V4s98MDAgNkDA8OoixzCLKGRBCEfbgs80+DF05eYhaurHb8da3XqkGMgSBJNXgBgsiMaFA4lT7mLxx5xTOG0nmDvtkD37lNPW6CnI9zXEXZ3hF2LujbesPr5zzvXRMQ4Nk4UULX4YvPbQ++2Bj/cGvykLbioK9SBXw5MQiaOEp7SCQ7tn6dlIdGhCyEE5xb3rnYt74lMz9XfMdV5/WTH0aOwCJXaQ713rH3lmU2fhBLR40bu+/DUC4qMWXgKdFGIMmgrrFrutge43e4xLDtgAZZ+bkpJXV/k8Q3ecIKU2zSXVdmPKjZhvxFykKxGcckMEKjcWYmoxRECjhNjInb5JZ5yN0089ZTS/U0ctjQ5QkEIZo5wu0h8ugvl+DWuLfese+Pb3oaohPyHN0B2fodjQxAm3xtOuCOi/D9IsJkoH47iF4XkGvhrJzkPLjKiCliu6o1gn6nJG52UpTui2ChKUluo9/4Nb7/Y/GVYjB9WNO3PNWfYtEY8GHordihNs4pgGJQ/6CNyP6i1/5/GlCyRfjZsxjy10dvij5VZhd/Lf6cLMiDiMB2J4NPKLMxTFW9MfG2z/x9r3etdUVGiMGvXGK+rOuWY4hlaCggApFDFqjGzEyTfTdCHJYlQurBnw1/Wv7GyrzkuJTAHrCePGWX61WjLYcXGM8dYwY80C+lJKkahBibfwGNr9NARSHoECuGEGE6wnwlRIsi0D9e/92zzZ554WMPrjiqsLTQ40YUoPRmHUw1JvqvFHnpABeGuOC4ZZLj5YyL2MBZ2hrP1wiUV9oOQQAhB4JL+q7+GFKSI0RGbH++0sBXse1uD2I3c7I8Rwv632hJj7lUVJxxeWKthOCTyBXWQzH5vkVIEFpG1PutY9Zf1r2/0bgMPAjodWm6iQ+dM/WmBDHvJeeIGQBWbhfPH2w4sNEx0asGMtWkgdEV9D2x85+lNn7hjIUK5cCL61KaPPmxfwclPnBqZ/WSknzTDvsruqge4XVVU9QgLvZW9kfdaAyKRsJWPjQ24jyKKSfqiVK4i+tNxiWDFpsgn24JP1Hu7QyLSy2fbQ4+t93SEEhylPOWqbCOvrjjhgLyJHEFvuT+zh34gxn3nR9aXC2jHJemjtuV3rn21M+zmmFDCYUm1U2vXYqVJmEC2RdkFLinAjadkDBJ7pf36yc7ZeXq9QCOJ2D/q//NU40euWHBq9phfl8zJ05qX9zXfuur5V1oXiBL2fdhTwopKe+kBbi/7/7/vjshWnhERtzUQf32zf6s/ftpoC1Z3eA+UA11pJyywEc5IDKwP+6ABvVAu6gw9tM7TyVCHGomL5KNtwYfWuV1hkaNUoPwUZ9m1lSdNyxqD3pRQprSLH+hS9iGsxMqQIMO+u/Vb4BAogkzHE6eexwkKlBSTlCZZdmcfJoZI4CgO5Sc5tSYNB4whB/6r/n1vIrxP9rjbJp52d82ZZ5QdaBG0673bb1v1/JNNn0QSgDwbkfXHvJVHVSpquTseUEH4Xd5iccU+LNTwGregI7SgM4w126/KLDYtxyFyU70pTVbkBJhEIJIe8sXS7shfVrsAYPhaaYAqcuN7rcGNnigMUEq1nDAze/xt1adV2YoRz4RQNqREsP/BiOzKJaET9JClYfTF5i9uqXs5GI9SDAbpTog1DtSglMbFxN83vvPghrc8sdCc3KoHas85IK+q0Oi8vvKU08t+oSHS5mDvnXUvY92LcwvAVX5kNkCaYRX1s8seQGDssu5wVJTw0PgATvWeGE4FR5qEc8dZscPBsfhFIyMELrsBPVBVOPAEJ/JkRU/knlV9m7xxqEsZTQJHzhprqcnSQYgmSlg+PDBv4r2Tzx5nzqcMgiltdocWu+3iBzj0S/EnGz64a+2r7mgQvb6jP0VzP0n+WOi+DW8+ufE/Gl535Ih9Hp56wVRnuZYToGbTmu6ZdNbJpftTKdEV9t6//s1b6l7a5G+PSYk0/MCA+u2p3C54QAXh9zsJERyMi59tD7qj4tnjbFVOHaVK1iFUvjJMQJfVcMOac60rwvZC3TEqY5I1yB+cff+yzHzOWItJoGiSZYSjeD+khxZMumfKb0uN2Yowo4TJjNoQLCyBkg2iJHmwj9L4wUP1/3FF/RgfOzdJAkoGEvrAOmTeWOiRhvdea/nqzDGHvb7ftfP2vbzCVswRCqIEvwySSdDfPeksgJMnJCTG5zZ9dtPqF1e7WuLAIaykCKZSrHr/fg9w368yXDWUSEJ0Ii01eeNfbA/tV2CYlcf+X6AhXaLoowldEiJp8ERxlohMSIEASFMEBB490njOOJtDx/5oWErM7hSBTqQjC2uvrzp1hN7ODjGYJN0fhpnad32obIMyFayEe+PhJxs/nNv0qSsakJfVTJ6EIoFgEJG2YG9boOu88sMuHXf01KwxZo0eY1MqmyOEUsxIytVZb6v+9UEFk3lKRUn8d+s3N61+fnFPg8j+kpr+Gaa9QdTr+zyggnBoDyE8lQaEFd4GkQaxDXNyqdmhQ8YiyahUNOQyHXPQR98Wf+zJeu/8zhCQAImswnppOIo91XPH2QqNyCVMIjf126ME+ZA7ddTsyyccV6i3cQQGKNNJW2GV7/7I+kyF7WC2RTyPNLz//OavtgV7eyK+nVEvmqLeLJ3lioqTzig7yKYxKk9E03NkBlm6ppSOtRRdX3XK7NxKjlCOch93rLpp9byvOtdBGQiXFVkBCyDGqZ/v9AAnt6rF0B5A5FNCcDo/vyN0RLFxnE0LPUhQgihNsulQgz7knaH4U/XeT9uwhkUtSVCFOhLpueOsJRYBmpAobZBTStPRDg6rvt+UHXTh2CNztZaBOEQ/pdN3lzTdLBG6Odj9wMa3r1zx9JUr5g5JV614BvJHGz4MJaKl5jyLxoDu7McGtx2IEipw3BRH2TUVJ07PGUcJ4Th+YXf9zauee2/78gTzBX6FduimCnbuARWEO/ONhAZ8KCHYFLVouGNHmTQZ3qIULVDBqg5aMsMKEoqLj2/0vtsajIlpWCGBsIw2OUt3UYV17E6QTPvVmSGn1nxu+aFnlx/iEIwcFsRMpnySwymVnZc0o4m2BHve2Lb4hZavd6CvIHm+5atP21fnGxzZOktMlLCWpgMno5jCwNjURYlWHS/MyplwzYQTq+0lkiSJlFvW13zLqnmvbFkQScQkXEoftdwFD2SE1S5oDxOV9C85vIO16NftISAwW89e4ajign4EKnVWogn0TIPvtc3sD2yCR7yigaMEkV1uFa6aaK906CBnwEWYpgg6YEVRRKkQ0yE0V2e9ZOxRvyqV/3DpAFQohtFvNwh9sFbcgdhQRo67quJ4HMfref0HW4PPNvp6wpjNYONxUWr0RgFRNFBC9bxwUP7EG6pOLjPlSkSMU1Ln2Xpn3UvzWr4MJSJ4mYSaSrviAYTZrqgNNx1ELJDCnvrr9rCWp8eONFHUmBi3JCAAmHSooQVwndvgRRqUl2TJ5IVeiNpik3DzFGd1lg7uZpuM6JkimEuxA+7oSCnN1zuurzz5lJL9DRzPUTkjYiRGUnIA3PCbAQkMJXlUJEIlkpwmSV3MZIpP3iHSEXJVxUkXjTlcx+k/2hb8xzo3dnSfa/R6YqKS96CKESIJqS2Q+GhrcFsgBh5CSjg9pz2qaOo9k387Uu/A7OOUNvk7b1/z4jPNnwfiERHzIer1/R5AVHy/0rDSQMAln5eSuEQWdoYOKTLqeIqjQoqYZW3shphjrPxBvAfjEo7MHlnvibJ8JksJAwGs5Rm5Gyc7a7P1gB+yosfjWb16zbffLsG1fMWK3r4+Qojb7V65chUTLl22ZOmyrq4uCCmhlJI8g+OumtNPGjVbRyhHKeQpwrCZUCT9MY8WKEGX6eOGikISIQrDSjSYOf7S8cdcOeF4HadZ2h1+oM691R/HQhq7Si9u8mFpjflDFQ+1zhV9o8UPlL7c5F/vjmIEdMd8tJxwQvH0uyf/plBrJZKIdWl7yP1ow/urXZvREWooVfpuD6ggHNo/iB4EWas/hojEbgqUONRxk4GBVsbKH/BYfb7bGni63uuLScCqLGaFSEiekb+8yjEzTw9HwwCg29raOu/55x986OF//vPRf/zjoeXLl0N106amp56ey4QPP3L//Q8AhxCKCGkMR0iu3nZXzRmHFtXiiIASiiZGqTvj2QcTYbfUJ9WMO6DIiLCuqBJ2YT5WXnPW6IOvmnCCSWB/ZkDDcXYtz1Nc7I8ZPMHebAOAH54Ia4FJWbozyi3YH8bG0kSnvKhmZmCSUkJOHjXrhupfFeqshKVP0hnxYBsWDwsVlAqBV2lID+C7GFI+nIVyNMvF8p7IaKtg1XIIRMUjiDiWHNiHCSAPxqXP20LPNHg7wwmEI5OmPvkGHiF7SJFBxyGJJaUwrAQlUmY8Ho/F2N/Yq0hQihKglxDZv1aY1KfyyrLA4Lh94mmz86qQ7yBhbcwQu+ODTdssrQlYAs+IsmLwB3NOdcG3buY0J4+cjRwIhEOTo3RSlvbiCtsEhwaKPCWhhPToBrbHCxxCwlGC45kDCw0OvAsOtE8JFSh/ZukB11adWusoHWvKPWnEjIn2URylFKZThKdLsep9gAfwdQyoqxXFAwifcEJyRcSaLB1OCFGV5UpQIZZZDaEZEdm/3IADic2+ONqSDayROHXcaaPNR480mTWIRlmUKtAxHZHolRRDhIZkZcCNI2z88dYRt0385czs8ZKEFIt+lF2SpJf/3GmNYzRP2dkj65k5D1bHp1+EngZOOHLEtCsmHD/KlIMGKtvHNPfN0583zlZmFfDjwlPSGUo8ut6Dfam4xGYmcLTEooEc5gYRJcQk6HGs8rep59879fyrK0+CZUooABzCmj6lDSugVE29Jz3AJe/qTfaAEiKIS1BXKOHQcdhToYSAiHzJ0cg4hCmia2VP5PGNnnrP4D+YZtZQrNxOUg73mXr/h+d4rY5dWlwaDcexr4DnmRAChXghBadUP0ooT7l9nGOuqzxpmnM03r4oJUSMZ+vMl407emZu5WZ/hy/G/phoqgeeIMUqL4vQJ4QjVEe5X+RPurrixHHWImhQfGQCo+Po/gWGc8ZaC4w8HpCjpNkXxwN+2xVGFVrQAYGRieKSmWSBVDwrZ/zRRVPLzPkc5SDFXs4GdxSM0p2wmcCFmXND43An5qkfxQf/+0Y7QglkM6OQ6aJk9CghtckbfWide11fFHGZbCCEUqLhyAkl5jPHWHCqgSaScVFKR4woOuWkE3/7m7POPC4NezYAABAASURBVOP03/zmrIqKCWgvLS351S9PVYRnn/3b6upqCKGcLsFwlOo4zQF5VddUnlhtK5YSsWlZYx+ZdlGNveTV1oWb/Z3pOUB5CJIIRyknSdOzx9848dSJ9lGYG3Iqw4T8EUX8BEkGnhw6wohVtEnAGyghlKx3xx7b4K3rizB90n9R1AmhVL4RdlFC2U3+KFxHKK6AkFPqcpNaDPJAZoQNahqeVRbJCJi4SFzhRI6e1/M0I7SYTxCqCLzOcPwvq10regaEJnQRz8ePMl88wYa+lKn3fyhlApvNNnnypNmzZ4HmzJldVMTSkcPhmDq1FlUI999vzghZSCnTZ/3Td0oNvPbIwqm31Zx+R82ZD0/7Xa7efuvaVzb52ilNKbEO+GAvFokH26cgMIRSSsTEBPvIuyedNclRygGSsoypUuUiMAHOLHD4EfndBJuCHHhkZW/kwXWDEz6eFK5ACQtpooSCEqKEbWIsJVb0hFf0RNqDCX9M3rFJ66lMhgdUEGY4Q2YRcyBvTMSWIEtlVJamCjQRShBety13LeqK8Bw7j1MaoRgVpcNGmK6pcdh1HNNUGgaWLpdr6bJl8xcsWPjNN/h0yqcRPT29OLOYv2AhhPPnL2hr245O6fimGBJ1mcDree1RhVOvmHBsQhIvW/7EJu92yg0ajjLYsbWf3IcQSilWsGWWwgennj8tq5wjNBIOr1ix8oMPPvzkk0+9Xm9zc/M77/znww8/atq0SRQTBp6eXm45f7yVI0lLCztC96zqa/DEFAFKmSS5HFz0RcQFneFnGr3vtQYXd4X/tcHz2fZQTzgxWE+tyx5gTpYZtRjggZgo5Rh4G4CYIVYiDtsV9652fdkeRN5T1qVQYVEvkf3y9TdOduCFUJGgBFH5AgNQgVq3bn3ppZcfffRf//rXE48++tjKlSshbGhomDv32cceY8KH//mIcm4BOXopBBsKI5cSZlLn3vLHFXPXulsIEAgBZiC3AXBE4ZWSoEYlUSwx5T049bxZOWz1SwkNBAKff/75U3Pnznv+hb6+vo31Dc88+9yzz81bvHhJJML+vIuBJ+eMs55ebtZy7M/c8Rz3dUf4z6tcW/zydi4ZcGE+oLQo18AfWWy8ptpx9ljrkcWmm6c4jxllgjCtoDKZHlBBmOkNxlNWsI9ZoIg/VEGsThDNLAc+vsHzSVuQEppGIJGvGXm6q6odWToeNYqPTAPBw0Qc5QRB0CQvgaNMl3JUyLg4bvD3kgYkFpdIgGvcLXfUvbKc/Q9EeMuTCLNBWClbI8olKTfkaqnMkn9HzekH5FZRwjZ40EAp1Wi1evkCjw0ho9Go0+oEeU+IEgKhRcOdO84G/GDDBi+MOp5b0BF6ZJ27K8RyWtI8IYQQX1TsizAhGXiNNAs1WVqOEkoYEfUaygODv+yhdIajDBFmEDieIniSjw9JVzjxXKPvnS04wiaoJhvk2+Rs7SUV9nKrFh1AsoxQmmYVASsZikSRHQUmcGE3RBZKEiogUb7SkGNtWA8i0ckcBgVb7227b8ObX3auiRHUIJPbWJEeDoOwuvyRSk0510w44ejCqVoOBwxMh+Ld0mCYNrX2uGOOOeKIw60225jy0UcffdRhhx0yfvx4/D5AgekRkmfgcWhx2AijlsNgkoajH2wNzq33MhzKgyQkgvfn1X3RNb3RuCglMCN5VKUYadZUOXCKiWdQBGo5hAdUEA7hFKQ4+AVbMlSJRDmE8Ev/SpP/9c1+P44mUp2U9kqH5vzxtmqnVuAAvHSb0piqpu4IcavFYkPgs49Vp2UxqtVorVarHZs2VqvDbrdYLLI6syClwlpB25Zg1983vP3+tqUhEfEva6GQoAkCh7nK4JBZiIr1jkvHHnXSyH0tGj2Xfh5CkAJHjx5dXT2xsrLCoNdbrNaqqkpUCwryeZ4lcxhAdww60iKcN96KowsedUrw9K+3+F/c5OuNiNDxRsU6V+T9rYGP24J1rmgghh4QE+jihiVosVkDJjUyVS5IVEp7gEtzKpP2AEeJVcsZBapEElCAzb23twRfavK5oizyFE20Aq6lFgFrtuk5ei2f1GetlKKVMRkfKl/FI0bgNOJ3F5x33rnnXHD++RMnToR4dPnos8484wIIzzvnwgsvqKnpP6JQDABYMNgd8Tyw4Z3XWxf6xYHBriixMokBsNDP05p/N+bw00v3d2rNNIkLltAAbPmd8Iun5z7z3HPzurt7NmzYgJdSvB8uW748Go1CARZAlLBuo63sV6Y2RwdXUEp8Mem1zez3CKtQPDVW4HBCiUUAg1RJMi6eEhBJXpTCXJJXb/0eUEHY74s0h1Ax8FSJJ8AsJkkfbQs+Xe/Fpl/aX9BBvOcbeWSJAwoM0IdEsUBxKdxQJbJcZWVlbW3tlClTcCyRl5cLLafDMWlSTW0tE9bW1mZlZUFIUxYxENhgInLf+jfnNX/mS6QRCDEl0KNQH0CUUDunPXfMYReMOSxHZ0WVDLzCkci2tram5ubNm1uwE4MN0hZ2tbr6XFgRZ+pSQvCrVOHQ/r7SPt6mSYgSnABXvLDJ925rgBIy0iwcWGjcP98ARi9AkNk7g995S4bScGThz/+Zx/7pJyohARHy5fbQ39a4scOOKAIeMA0wKJEtL620YffPIFCqiCDdNaLyNUhXlrFikBzVmCjev+Htx+rf86YRCCmbH6aYSZACM5yR0vPGHXHVhBOydVZChpgcdmJwRFk+enRZaalOp3XYHeXlqJUC/9wO20Loj0CZlKW7cYpzhFmDFz/kN7whP1Hvxc9TOCGNMgnIloQMGIk9SeaHqNfQHoBvh25QpcAb9vsWdobuXOXCCyEcgpUohGBQ6gT6+0obDrXZqyNE/YSI7a/8IFw4Ef1nw/sPrH8jKLEp4MgPX9uQhJc5jlCdGD+t9MDbq39t1RgB0EETUnCB99JTTzn51ltuvuGG64DGadOmgr/pxhsOPvgXeF2EzqCZc5RwhEzJ0l1f43DqeLwZwmxbIH5/nfuTbSE4RIAGUa898QAcuyfd/r/2QfCB8HSIKgRZbziBNDjKLOybp5+eq5shE5h9cnW/r7CdNtoiQAnaMqGjTHJlh0Ju2r0CNgAhlOs8rStczfvmTTyisPbw76GphxRMumD8sX+edKaOw44IdmySU1TGhjWFUMUWkUG+kPqwGWM0sgqEikJGmbSgoGy/AsOfp2UdXWyEHw4sNIy1aRZ1hfAjlVQiBJYVIuq1ax5QQTi0n5SQsmm5SyvtD83M+fuMnAcy6KF9c3AMDQQqWJVNKD1k9ocrKKEwNsFa/NDU81+a9ccXZ17x0sw/fge9OPOKV2Zddd/k32brrAAwlbvDAlCBEpRmwO8y9T8lcChw5IBChsMH9s25b3o2nHNNjSNLjxzM7O2RfdZxOH9UEH7Xt6/nqVPH2bWcQzeAAE6EI3pSfGSiaU6uZhbYadyRMhW+lzcJOpvGaBYMFq3BovkesmoMPGVfK90BgcpAdCcXSekTQqIi+ze0AT7wKaIKo9x0PIVbLBq2hwxGyyliReUHKIeVCW5YPe0ePCwCcUjKNIWozqxm8uibWd1jHnbwOhiM4TSc/TkBVBVSDCp8ZqnIlRI/AQqzsxIKIMIM4wCDabX44mv7gET2F/qyOmuCeZklDKyoKETkbuDBqLRnHlBBOITfZFDhp50RJXRIIoSCqHyRnVwssrGBKbciTBWSa4h1NEKg1L6/hGpclNb2RQJxEQOjA0oQGBCYTGoPxgPYOUHD7hOFIUJa/bH1bgZCpZphBs2MKEGLTJQqPCFUJqJeu+sBFYRDeywZWZR8NzN056Gkobi40R2lQzXtigzfU0wkq/qiyh+T2ZkdQA8ai7si610R4Ba0K8bTOjFRckfEjmBiozu2pi/SHY77Ypl/MGcIb6BvpotQVWl3PYAvd3e7qPq75wEgIRAXV/dGP9ga7AolEOg768+SY8ZHURMl4oqIWB8u7gp/0R5c3hPZHmTYgFxRyCz7Ion3tgZe3+x/qt73TUd4Z2NlDMLYtAUc/X24LfDIBvf72wLfdIZx/PBmix/nEGkFpj3wk25SmT32wDAH4R77bfc6rndF/9Ma+Lo99OE2hsMhO6fWrYMbAaQGT/SDbcGXm/xIUC9u8v17s3+tKxoZCoXZeu64EvOvRpsvmGCdma/XIEkNtKcgKC3DDwQoXS0yCqeWWW6ZknVqqeWQIuNttc7TyiwjTEJaQWV+DA+oIPwxvDrAJpaOU3P054yzHl9iPrXMXGgcIqaBDXmDI9lRWXMqFexDTs/VXzTBev0kx5x8w3WTHJdU2Kfn6LEHqihklpSwjdEap26sVUMJWz2S77w8UdEXHYhmSrDTOdIsTMrS6XhO4CkHQ6T/8sdETzSBeiZ6UVVpjz2ggnCPXbcbHRHGBQZ+v3w9zjwoKt/ZNSFJzd5ByGAd8o3MQp6B5ynDCUldAAO0sRDFC6FiG7nLpPmebxY4R691rmidKxqOS2kgwgKozCJUO9m5A/jUOGyHFPwGd3RFD/u7m8CD8POBHI45gFBVaQ888D1f1R5YVLsM6QGjhiu1aoZsSgsRx5GE1BFMfNIWckXZ2yMkSisYYGJqjk43MDFBDgUkNCxQsfcDHgSVDPBQXBAOInRZ1h35YGvgrZYA3jb9cZyAMBWl4wizpgSHgIQoVSKnaQWoLf74Zh/7E+QK9tDEGllFmYssUIvd8YAKwt3x1m7qIvpBSidEM0jhUUIOApNJ2NhEnnlnS+Dz7aH3W4OIdSXuoYO+SIDFJo0WN9RlQtQrwQ9E4bXTH2N/tBRgglxu/65CyxGnjiswCsVm3qnnBQyQoY4qKEPA0EhlHZx/dIYSYFFFmanz8+Z/vrNTQfgz+m4EjmIlOSVbN8oioMw1AAgDAAUAZsY9eCQ9EDITFpZ4VcPXCYI8/VSASprPZLBeHW/XHlRoOGyEscqhNQjol9k+gA/Fpc2+ODaWXmn2L+oML+kOY5fo265wezCBNe0AVbWy+x74LtfvvjW1xxAeoENdQ+gR9v+/Zut5QOLwEUYgxK7lOEqH1IQQu6Zb/PEv20PPNXpBK3ojz2/yvdkSWNMX9aINGt9JsAt8j7ZoStnfEM4S3c7UoQaDmzzRlT2R97cG17tjWwMJbPMu6AjX9UVwrgiFnfVV5bviARWEu+Kln1THKNADCoyDvhiautJTwdl9ezDe7Iutd8XW9kWxFm3wxFb1Rlb2hrf4dgGFhAEPi1sQAEn6r9RINCnGLcfA719o+N0E28Mzcw4pMhxcaHhoZs7FFbYDCg3ZQ+7S9ltTue/3APf9KqrGj+8BKl/KOGCxtUkR+3KdypfMDiiA1Rm5+nPGWv88LetPNfYap/amKU6c7P1mjHWiE+caA5TTFdkYTIPSsjSTakwLUgy0BY7CqEVDx9o0pRaNWcOqEKIppaXe99ADKgj30HE77fYTNmAdiG0YjpIiE04UdLl6nkmk5FnCd0yEUkKHuHbsQRXN1NPWAAAQAElEQVQRbggUlKgWGYUSCzvqRJUjBCVRr73zANy4dwaGX29lQ3JA+QM5YQhc0MFBTmm/BJzy/dm1PI71TEhMhKAdcvJDXMwUZRchzCRlBalyaqscOrBKlWZcRL32yAPKl7hHXf9fd0phTD6LHliwYzGWbJB1UgTtvfMGMzRwlFRtCLvpsCcUWGAKDh0HEOpZfiKyiKYv1rzXH6oYle3gmKTQxIOVZbirtLceUEG4Mw8yXChtOKxLE6SKcFC5tzBM9Yd90CDjO6umYYC3tVyDIChYIQoOyY90KYOkJ4kfix9poOFjVgXh4O8acEgHlhJqeOlC5IEYI+dB9AEsQwmlHbUfjIArUNocBk3z38GgC+aWVvjhp5U2TRjCMRyIqNcP5AEVhAMcKcMvGcO4AWk4IlvYEX62wTu33vve1iDOrCMJ4JT8Z0vg+qW9HvnvAoYmsIm+e0yYhGyELOuJ3LPa1RlK/gnp7zeInjIp3WUWxff3210NZhQfQpb3RO5e5WrN+GdhdsuUbEMtBnhABeEAd2RWognp07bghfO7r17S83QDDsR99652XTC/CyDpCCY2eqLfdodd8v9PgF7AgEIKjzJNihxlWpLJQA5KS1p8sfkdIZfyj6ukGnAHQUcpwSikVFGCFMmgEvJMSrdmCsErcjCDSJGnS/bbQ0izN/Zle6gjFGfK8k4sY/AjJOuBx13RBA9CNZOA2MyqysMDKgjhhMGE0MFp92fbg39d40LbLVOc8w7If+HA/Edn55w5xiJQEhElnhINJYr7JHQgBBkyEJdYbJLkBTFyKeTBuASDqILQBiHUUKKKYIYCGMhBRxWbHp+dO9amhQTZEAteMOgLC+gCBYUgBCnyhMi2iWANykqrUkIBhDN99MUQEKKKEoQJQwI5eqGqEISKBZjFDxD4tL6igOMQ6B8zyvT0/rlTs/VYkSqrZUwApmAwUx98OCFBvqMdxZpapj2gRFG6qjJJD7QHE2+0BPINws1THAcXGUeZhSITX2HXnjXGct0kJ6oIMkStoh2Mi8u6Iy81+bFkfbslsC3A/gU/BF9bII5cOm+T78l6zxub/Zt9MaVLozf2NZJJMP7F9tDT9d4XNvlW9UQQsrDWHUnUudj/sOuNigvaQxvc0QZ37N/NgSc3ej7YGnAD/XLOAUg2uqOvbfY/Xe95a4u/0RNb3BVa55KbYUUmYInpNPueqvc+2+D7aFuwLyICSP649E1X+PlNvrn13ndb2WwBrYgoreyNLO0OI9G9vjnwSrP/rRY/0jIs4UlRYnqYc70nCiNreqP4uYEQQ0D/7S3+p+o9zzX6sG7HFCDHGn5RZxjP9UyD96NtgU55dQ25QooTFF4t4QEVhHDCAFJCpMkX2x6IH1FsVP7/IwQiI6y+JJb9WBKQO0GIcER837fG9UlbEEGPsPvHWvcmbywYFyF/fKP3o61BRCcY6CCI0WVBRwg6D633PLHRs6grBCz9tc61oge5hCzvjjyw1t0dTnSEEk/Uex9e535kgxtQWdgZvn+NG9gAGKA3vzOMVfELjb4lXZHXN/sfqHP9dY378+2hqMimjyGAqyZvDF2AjW+7wp9vDwLtkCDxAl2YCZaUQPuTG71/r3PjV8MXFd9o8d9f5354vefVZh9m+NA6NpwIzOOpCcETPbjWjRfCZd1s6C3+GF6HF3eF713jwjwxvY+3Bf+xzv1VexAIfLMlgEXE1x2htX2RR9d7H9vgaQX0YUp2Wv89WR3uNxWEgyMASyxgrCuYoJSWWDRajvI0tSUIhrK1n9IHsU4IbfBEgaIyq+aaavu1kxwXV9g2umMvNSGq2bn2+eOtN0x23DzF+bsJtnpP7L3WYCQhIUki7oG0s8ZYb5qc9bvxtkBMQlb0xUSgKIw1rcj+L1t3JNHoiWFpemW1HRZm5OkBj02eWLMvNq/Ri7lcWmm/cbLzD1X2kWYNrCEvAXsEMS6xf8BscVcEmueMwxAOqGFixSah3h19cZOvxqm7tsZx3STHRRXWda7oGy0BgC0QE7f4Yjl6/oqJ9iurHbPyDIBWTyiBfVdYRmbDLlSZRRNMSEAyCJCeW+9Dxr5gPIZw4jF/VWbOMwgreyLvbPFPz9X/qcbxp0nOX402L+uOvNsawINjbirt6AEVhDv6hMEMYEDwaTlKB7TLNbmQEQhNaYM7hlXivrl6p46Pi2SCXYsQR9h1h+L75Oj3KzDYtZBLpRYNFrdYkQbjEqDi0PFA4KEjjOU2YVaefrwdKIqjiUgSzIMwrIaj6H5GuWVSlq7KoT2wwICl4NZAHNHfHRZPLDUfXGQot2nwenZCiRnwALaV6SbnJkk4RAFIYGecXXtgoTHXwK/uY+ve/QsMNi0nSWSiQ1fl1H68jSFE4Oh4uxaYmZVnGGvTHD3K1BtOLO4KU0p7wuLynnClUzvaqsHk8asEavRGsc48tcxy1EjTBPmpjy8xT3RqV/VGOEpm5xnMAgcHTc7WjTQLyMbYzcKIIDyaSpkeUEGY6Y0kDwxYtBx+/j0x9hKlxLTcxkKIfeQKCsS9J5roDCce3eC9bFHP5Yt7rljcMx+xKbF9miVd4T8t6f3Dou7rlvTcsqwXmRDRKWJ/UJJMAs2X/6IKSijPsT8MDbNogU1lOKwBIccRvBW/BJASouXZl5WQJCyAzQItNvECRykh+Oh4Ci1YIPLFUbZpNKfAMNGpe2Kj96IF3X9c3P3mZn8gLiJhYnZYgv7+GzbbPyzuAcxCCSmaYOC3ajgQDGIOlQ4t0vsH24KA8UZ3dFsgAVzZdbAtj0GIK5KwailgqaGUTYMQlNg9QsJs9Sf+str1B9kh1y/pW9kbwY9aCBs4RL2G8AD7XocQD2MRQhk/9iVmwcDTpV1hZLmExP4iakWOn3YWcbJ/EHMgjlKHlju51HRphe2SCttFFbYbJzvuqHUiHP+x1hOOixdNsN1Sm3VLrbPGqcVeJaXoBDOEUoQ6YRUsIHGX5bLhAQVTyhBgGhrKEB6IS+DRitminaMwwQg8CMaQG++a6rxnn6xDRhjwFHeu6sMuER7KqeNOL7f8vhKztV44wXbTZOd907PNGg6PiY4wSOUb8tjxo0x4FVzRE/6mM4zfgposHTDIWqFACGAfEwneUbGUhQAdUSJDYiYFRh7byBdXWC+usIFur3XeMNkJuKIJE4OaSpkeyARhpnz48ogSULlNOyff8F5r4N+bfZ3BeCghhUUJ72x4y8I7Dxg4CLmDp7QUWUk+n6h2aufk6Wfl6bHGKzIJHaGEK5o4oth0UKEB4WsSuGBchGWlYzqUUQVlVCmQpAQ05DuSKEkwDuB9uDWAyeBFDhlpTV9kiz/GcUTpSIFqiWCSAMm0HB1eHe/eJ6vErFnvio2xaXEGiZlgiYsHxGyrnWy5KE9M6c3GhAWeErzXITFicxX29883YE842Qb7hIwwaUJxEcDeHohHRLb0xSOH4lKZRRuIY4KkNls/J1+/b56u0qErMAoaeQxmQf0M9IAKwoH+kGsIQSwXf1lmPqjIMK/Rd/Py3rn1Hmy4P7TOc93S3kfWe7pCCegoIT/RqZ2Zp3+5yfeX1a6XmnzPNnhvXd4H5SwdlnYUWxTY9nhpkw97ns2+uID0p+QvDAQQo+wnCfADIUEy4+AIPv1KVBmP0CqH7oQS07fd4TtW9GEz857VrrkN3mBMwncJ24QQpKaYRLBbe/3SHkAIpyMosQotkf/WjH1yddDH7iXmjNlet7Tn1WY/ehGMRvEh7KIs+Tt1PFC0uDuCPRW82mHRK7G25AcPfnixESC8e3UfNntg88ZlvThHgTcqHNpH1rvvr3O90uTDBuwty3vhh5gyOdabskL9pDyALy7FqnfmgWR84FZoEi6rsoOwsTG/I4xow47IRKcO+41owlbH7HxsurC/K+n88bZTyiy9kQTOJLBys+notFzkQ+2vy614bUM6XdQVRjSfPdZS4dAYBA6bNPvk6rECxIAYCME93q6pcmiNPDfCJGAX1KLhrBo6PVdXYtFQQpQUgmRyQIGh2CyYNfTkUvPllfYcA49jOi1Hfz3aUm7TYAGsaKIL8thoiwZdVvSwnUnssqLLYSOMWTr+yomOY0eZ2gLxD7cFsf8JSW22Ts9TpMRqhw7TI/IFU0aBostRxcYji01jMCFCYLnELMzJN+QaeLuWO6Pcil1fSaIAPN4ti4wCEiwOdX5fYT+q2NTqZ0PghRBvvzAuwCJRryE8oIJwCKekRQjQU0rNd0zNurXWefNk5+1TnVdV2/FLb+DpQYXGy6vsNi1zIHb/zhtvvb0266YpzptrnTdMcs7O05s03JHFxpunOK+d5EB55hjr6eUWZFdE9px8Pbb1c/SsLyITWRche3KpxarlpmTpLqu0IwXlGXigHXYwGYQ+SmyTwBQ2M5GOoIk9SbzOYUp43ULmwfaJUeCUQIc+QIjchZMJzBwKd0x1XjjBmqPn8VZWahGwQL0Ds53svHWKEwpYduINENn1lDKzSTYBCwqVWzU4zMCWqUPHoS+mMTlL98dqO/AGHsKTS82wgJnA1DU1DoBQkqQxNo0yhDyBrD/VOIBzpTt6qTTIAywOBomGcxWQIOznnuBCFKIEZev58TbtBId2hElAxoAEBCwhG4BRCHKcwlU6tGMsGiAEOIEcaRBdKu2sI1Bh0XAOZD1CzBoONtEKHRAGQheHjoOOHrumSIiUIP3iJwCaUFBIoATI1HIUeMPJOLKuOyJCrSeceGdLwB0Vkaz4jO8TZoGoUosGs0Ipj5x8Nj1PR1kEyIExzAr2gRD8oGDzE3wmwT4eE9NLC2EH04A+JBgCc0YVvwJIvGYNltIQMzIIySHwzmzSZEyLNaqfAR5QvTPAHahQSiilYEDJGziQDCxIQKj1k6ycFMo6aFKqSomq8jaXamSCnX36uwylgSQDionSit7IA3Xuq7/tuXJxz1XfdmNhiXUj1rH4OoewMOTAEIIIkfVxdImtFEnmyY7XzuT9milTsiYr2AfNshz3TJIdlikY7jy+teHugiGfn1JEEYg14oYaI1aTP5RSwogQSlIXq1PCSkJTMsYxiSxAQQnFRVASilImgkupgAGBRwlKM+BBEpE4dMaJiI7/zRgL1nhHFBux73pAgfGmyY4LxttwUgI1hTKDn1I2mCJXSkoIE1JWEkLYnVKUJH2hluJpiknfB0lQhToopZAcPC0HIzfhTnHJvFr0e0AFYb8vBnGUErqzi6ApRYwfpIemQZJ0leCizDJ0FKLfcUFZIcR1VExsCXQv7N5Q791q0sRmF+jPGGPB4eQFE6x4QcVqVtFUypgYb/Z3dEe8RMnCijSjhMF0zRcLvdm6qCXQBUlSLiXv/RJwGdTfnCHckR2ohhpoR63hLlFBODgCsN4bktJ6Q7YOKUx32UsGORBYeq114RFf3n7BkkfO+OaBv298pzfixfuYwBGBgZikL1mZLOzeuN8n1/1p5TN9ET8CH9NLK4CBRCkVRGBtTAAAEABJREFU5S2BzrtWz5vfvUGWywWaMSRJYhGitAWlC9ohRDmIIARBqJRgQAP4pEmIVUp64EcGYXKU/5lbOtQwY0SbQjKPeEQjI1R3kZj23n0wEOaAxOmK+P++4a3ZOROe2/fyW6t/Nd5aRAnhKOEp5SnhCCXyhXBHkMfE+IstX0VjodV9TYt66hma0q14DpAkxcW4xP7pCtaxzFLwl2kX/iJvIio0ZUruga5MU4QmRUqFbRBJSCKGgBBzS6pBkZEkSSLkslACAzUoowUTk4WsyOzF6sP+ww17D3yvA2hmAH2vNpRThHjdAxo8AqxB1BH2eCK+40ZMr3WOPrpw6i9Hzc7V29KAoRQqjCSJvTc2+Tvmd9b9duyRuQbnFx2r/PEwayNkWd+mr7vWYU37wpavHmn88I1t3/ZEvIAEeoUTMRktiiIrRSK1Brpfap3/z8YPHt/08Wcda7yxkDsa+HD7in9t+gjCF1q+rvduj0sJaH/dtX5pb+Ma95Ynmj6Z37U+IsYbfR1QeKzxw+dbvtrobQMOoZYk5ZGSFfWG31DVCUN5IJyIIuDc0WAwHg4lIlExFhXjCLiEhF/6JLSUflS+0vkDcEgRpWQPSLHaX1IWv1KhwVFiKfhg+wp31A94iJhCvwpLbUoNymDe2bZUz2suLD/sgNwqYGOdeytDGiGvty66bvXzd63794st8z9sX/mXta/M3fSxJxbsCLluXvPCkt5GoINpApSENHrbblj9/L3r3/qss+6tbd/eufa1xT31sPaXDW++27bs0/bVD2585+61rzb62tEFsLxhzQv3rH/jtdZvGv3tK13Nd9e9NLfpk6V9TfOav7hzzYvL+5owMZWG9ICaCYdwC6Lqs841lyx59NzFD569+CHQed/+84Ilj1y49LFLlj3+++VPXLb8qStWPH3limeuXvnstaueu27V8zeveenWupcR3wjE+ze+82DDu4/ICWRu8+fzWr56ccv8V1sX/nvrN4jmd9qWvr99OTDweWfd113rFvc2rHA117m31Hvbmv2dbcHezrAbwGB/HhMLQEIo/iPErjWNtxa/1vTpQw3vu6J+AmTKUAGTJgn6lG4N9rzbumBGTkWpOXd6zriwJC3urY9LIiUkGI80erYihd5Udeqfa07fN3v861sXbwv2RqVEd8QbSERgCjgklEYSsb9tfAezur7ypLuqT7+z5vTzyw8pNDhLzflXTzge1btqTj+v/JCN7i2fbl8RjEcx4XWerdOzxkIO5L/Ruqgj5L5s3DE3V5165YTjQvHIM5s+6Q7LWRdjqDTQAyoIB/pDriEQw4lYTzTQE/X3RHzY20AA9UZ8KGXy9Ea8YHqjvt6IzxUJeGNBfywUTERAyJnhRDQmJuJiAvlKlKMfXtZygo7TGHmtWdBZBINNY7RrTE6dBSV4i8ZgEnQGXqsDcRoN5XkOb3wADoCF4zsK0C7sqtu/YNLrrd/8df0bXREPxSXPdlDxRefa9qj/nNEHc5SbYC2e5iz7smPN5kAn1EUiTrCNunzcMTOyx1bbS+bkVUckEZPnKAbiOIIymVQbfG3z21eePfrgE0bMqLCNqHWMxgK4wlY8xlIwK3s8wNwd8Vg0Jg2vafRtDyTY/0oxzVl+TtlBU53lWDKs6ttUaMq2aIzbQ316QTfaOmKZq7nBv53lb/YZNOXhXuWGuwOGen6O0MMLpzw38/JXZl/14qwr5s28/Jl9L3ty+iWP73Pxo/v87uFpF/yj9rwHas+9b/Jv7p181l01p99efdqNVadeV3ESssQfxh1zydgjzy8/9OzRvzijdH/E7onFM44dsc9hBZMPya/ZP69qVk7F9OyxCNZqx6gJ1hEI6xJT7khjTqExK89gz9KZbVqjUdDpOfanRgkBMmhcSjzV9Ol4R8lD+1x0dcUJH21fcc/a1zZ6t91S9zIgl8AKGdgBWglxR/1Is+5Y+MmmTy5Z+q/b176yxtO6pK9pZV9zTIyLkmTWGLJ1FqCNEqrheI7ijZdlUHzw00OSl7Q95IpKIt4/BY6HJiV4b6FQXtC94fiv77ls+RO31b36YMO7Db72mASr7GPTGPBTAgOYgzfi+7Kz7vo1z1+z6tnrVs37uHO1U2cVKM/ATqGi0gAPcANqaiXlAROvy9Pb8/UOlHl6GyhHb8vRW7N1jLJ0FpBDawbZtSabxgiyaowWwWAW9CB0BxkFHUjPa2XS6HiNlhNAGk5AcPOU5ylinBFHKUcYUUJBqVkk71gctoddlbaRmMwpI2fdVnP6or5Npy2479mmz5B4k/rAkEQ+66yr62uqsY/qjni3hvraQn2YoYnXfNq+qivsEWWgJvWZbUoIiOCiBOPirhDN1Vs1hK73bAXCmWEKOfXHwrfVvZyjs74265p/z776iX0u3jdrLECMNsIUcGc34NykMRxZWPv8vpe/PPPKl2dd+fZ+1z8z47JaZxklGIVCT6VMD3CZFZXP9ACCRSYWN5QwhHADSz4FoSEZjrIFXroLLKSIUJIkQgjd+UVSFzBcYS3+qqNutbulPdQ3zlp0YG5Vh68tS2N0ai3QYkig1J8If92xJt+Y9a/pF78559p39rvurTnX/nv2NReMOQJ7KsicmIyCQ3SRCa+VSIGEYEKpXIrpEEIA+H3yq7GD+lnHmiZf+wbP1i+66tZ6Wn3RQL7BDiPuWHBJ76ZNvu14OYU+egOrMIMhkNirneXf9jSsdrVExHgoEd0e6sObalwUoSmPh7tK/R7g+lmVIwQh+BMT+b4LUQuQ/678UB0hV66Ye2vdK9evfn5pX+NxZb8wak0vbvk6JiUIDvEkqcXf1ebvPDSvOkdnE9kKEa9fElLuofmTSo1Zm33tWC7aBKMyIKUEmdmuMyEta6mQq7MYeYwAS2iXtJzm2ooTRplyrl09D0vKK1c+g3GxhXP0iOmfdqzBFustdS+9vW2JQdDbtCb83Mhvtib0RH+bxnhm2YHjzHl3rX316pXPXLPyuT+teg7bUcFEBM9CoEHUa4AHuAG1/4XKcJsjlaO21jn67tpzTyzed7x1xP65lXj5vLvmjHsmnTkzZzxPKXTwydHbfjPm8BNHzcZ6mFKqOIoSOtZa+PuKE6ZmjzuheMZ55Yek5VW2kZePO7rUnJert11XeQpeU6ncRuURMdADU869bOyRM3MmHJY/+dqKEw/Or/ndmMOurzx5qnP0L/Kqr6886Z4p5xw/cpZVYzi//JBfl8xJ9iZkiqPslslnXTHh+Nk5FZjtxWOOOLvsIIfWBMuUEEpREPVKe0AFYdoVAxiWRNhiba8+sLg3/dE9k6rsIy8ec/ifKk7A3s9hBVPsWjPgcUrxTGx4QI0Smq+3YwcIOz0cpagqQkoINl2RDGvsJTOyxmJzSJGjLDZmH1e0T47OahL0J4+cibwHISVULglHaKk597dlv7hmwgmXjz8G73hAUbbOclbpAZjDBeWHYov14Pzq6VljdJzm4PyamdnjlY4oQaPNBdC8puJ4HFGcNmrOKFMulS2jSaVBHuAG1dUqPAAEJl91CPtbHlDFC4+ID9oUySBGrqKATloZ6gyBij4qaJaJKchVFEw/JWQ8RIRtnsh3vGclR5dVknIqV7CuA4GFJkhhYAHE7BO5I2Fd0hKogYcmCDrgIQGjkFJFEwhyVEFowiRQMiKpBS6aCVVa8XIIRiGIoQZeYfDsCdQJe10Fo8wWxkFMjJtKKQ+oIEx5InWXQwSBlKxzlChpBYwiAkNlTmGgCieihIxJKKGEMAZ1kuIpUS6oMWt4hSOpJhkqELIuKTnUFU1FSOSLI9BiuEIreBDE4EFMmbBBFX1KGE8JASkSQpI8yRgOPKQwCmJqrM4+Si9IOMoujjJrGI6jFEQpoUSWUCoLFZ7gQhNHCSVEZtiJBHiOECyYOUJJ/4X59ldUjlNdkOmBQQj0x8Uv20OuiAha0BHuDSfAfNMZ7gqx8+mv2kPd4UR3KLGoM4zSGxM/awv1hBObfbFXm/2LusKBuNTsZfyX29lfUI8sgdYPtwXf3xoAs7wn8kaLH6U/Ji7tjvx7s//r9pA/JjV4YqjGRKmuL/pmSwA87GCSW/3xta5oKA6F6EZ3dGVPxBsVGzxRDIFpt/ji/9kSeKslUO+OYoYvNfmafbEmbwwWvu4IQ3N7MI5niYoSHuHjbcF3WwOdocQ6VxQzafXHoI9eaMVAvRHxk7bQ21vYP1PRFojD5vtbgxj6i/YQJrzFH0cXNtaWwOKu8Fft4Tc2B/DgbtYriF4YFKbe3uJHx/Ygc84rzf5GTyyx+9DDZIYDqSAc+ltGWCNoPtwavGlZb6M3urovcteqvjpX9INtgXtWu9qC8c+3h25e3ocgXtoT/vOqvlW9kfdaA3evdq3oidxf5673xBCab7b4n2nwNnqiK3oZYHoiiZea/F93hBZ3hT/ZFnxyoxcwe2yDByEOSGxwRf1xyRtN3LfG9VyjFzhHd+B8boN3WXcYAAZ0AeZWoGJLAF3+Wuda746+2hzAHAJx9lcPAt69kQTw89wmX0dIXNgZfmtL4IvtwZc2+QC/V5r898r/8uFrzf5P2oKY0lst/hc3+QCY++o8rf44fgUATrhjUScQ6P+2K4wHgQX09UQTy3vC77cGVvREH17ngeXXW/yA4pq+6KubfQ3eqCuaeH6TD+7CE320LQgnzGv0t/hj/2n1v9Dka/TGnm7wbvLGAEMQhlAp0wMqCDO9AZ4FCftQsi0QR3qpdup8MRFpRMdTRNWS7kiOngdEl3SHp2Tr+iKJvrDIUTTFkSpLLAKCu9Kp++NEe7VTizQSk6SRFuHMMRaHjt/kiQFaF463XVPtKLVoMMqsPINdyyGVIQVNy9FPztIBn9C067i+iBgTycw8fYFRwPkaqCucqHBoAjExkpA4SqIJgiQJ1JVaNYG4BEhg9P3yDaMsgkDprDz9nDwDUvf0XP1oq2ZNbyQiShOdOkALYLisyn7VRMcEuxYPtagrXGlnfy8TRt8aiMcl0hFKjLVqpuXo4qKErD7WpqnN1idEMsqsmZGr03Bkiz9WbBJm5urhCrNAp2broYMMfOVE++VVttNGWzDQjFz9caNMq3ujF0+wKX+9VXuQ/WNVcLFKgzyggnCQQ+SqhBCXkEP8MVHPU8Q3lp0I5bV9UfgL6Pq2OxyOSzYt1xsWA3Exz8Cv7IkAGCPNAmBW7dACt8BMuU1zfIl5YUfk/dZgOCF1huJOHZdv5I0CByBhpHmNXkQ2YIblYnsovqYv8lVHuMjEowplRC2yK0aZ6NBFEyKEFQ6dJyoiRXOE7purX9YThtlCIx+Ks7+YGKAFZqbn6Gfn6Z+q9yADA6LIQrDgibE/wC1K0gZ31KHjCowC4BeTCBDliorATCghIVHjFyGakLCw3B5MoOMvigyBuBSMY2EcAT5X9UaQ7g4qYtjGa16DN4YVgYaj+LVa3RvN0vMFJgHusmq5bYGYQ8thwgmJ/c1rmB4yOaaBR8p66aIAAATxSURBVFZpRw9wO4qGuQQJCpsIWPUhY+gEihjd4mfpbpxNiwgrNguEUKwAEXPAG6I8JkpIa4VGPs8ogCkyCcDGV9tDgZiEZOWPSbkGHqs17EsgOpE58fq0oCO0sjdyQIEh3yhAPyDDeEqWblswju8D8AbS8GY13q6tdGqRcwCbuEgw0KreCJagQHJckqbm6GAzW8cgjd+IYEJCZi4wCnV9UeAcIAGKMJ9zx1nH2TXQFDiKCUPuj7G16/yOUJMnVmLRjDRpsNj+qj2IQSdl6bYH4zB+5EjTOeNsI0wCfixgdoRZYxTonAJ9vkFwavlIgvxugnV2niEUl/AI+FXCVAHdT9uCeP/sCsVhKs/I5xh4DIrV7OKuECZWZtEQAtcSohREvZIewJee5IbxbYhHh18OLjKeUW45e6ylyqHFsvDAAv2JJWZE3gS75qhi06/LLSDE35Rs/ZHFxhNKzXPy9MhOx44yWZEdKDl6pHGsTdMTTqA8otiEzFPt1E3N0UOC8cbZtXPy9ceOMuYbeCiMNGt6ImKenv/tWOsvR1uOG2VGyB5ebDykyFhiEZBGzBru6JGmzlAC8oMKjVi7YjF5ernlqJFGnqM2LQfjyIoAKiCE1HTMSBMWhEhlhUbBJHAw+OvRFiwUDykyYNyuUEKeg2ZGruHUMpNFwwHkWD2OtbEFKp5iokObpeOsWh48MiEwjASLyRw6wqjl6YGFhmw9z3MErkDyxC9LmVVzcJGhI5iA37Qcrc7SVTi0eQbhpBJzeyABBi7CJGEH48obtPJdLWQPwGnyXS1SHkCggICKmXmGIqMwI1ePlLV/gWG0VVuTpavJ0s7ONyC4AR65yYiMVOnUARJ4+0LmGW3RnFBiPmyEEVkFwABz7CjTGKuGpwSBiyqwND1Pf1ChId/IA0uTs3UA9vElJryDHVhonOjUjjQLgN+cfMN4m7bSwUjgCEcJ5oC+mMx4m2afHB1SMSR4WxMoATJPLDWhCaG/X4HhcPkfwICpGifLljAyPVeHCQM8k7MxtBF2gK598/QjzXy5VQPEYmI1WTqMUmDg8VwKYErMmlPLzHPy9fgZwtMpFqCPcTUctWo4TBim9snVA4qHFhuRP2fk6R06PJcOT4FHnlNgOGqU6ZAi4wiTkHKweh/sARWEgz2i1DUcASEoBY4aBIo8Bh5RpZGrKMEj+tGk5ShPGUigA4ZSYtVyIOgLHOMt0AasCVuEYUFr03HoAmWOUrSA0QsU+lAzCpSTNaEGIVINNKEjyzAf6tBxGJHnKNIRT9m/i6ThmFkBA2k4IIdZ4ynWq1DQcMw+RwmEAkcpJRBiziix8YMSxnlICZskJsDJM4Qmmjh5SA3MatmzYFAIKaVsYjzzBiGEpwQTxqCYOXhYw/QwFvqC5ymFDoaDEN3BZxBryqgOdxaeH+4u2PH5lRhJl2BAihoYhQZV00KFQQkFlPAvShCqIDBpCfg0DSlEq9KFlXJMZ6oxIT4yQTOTFDW0QKiUaUapKgoQgtISxsijKEJUQeAHkSJECUo3KbxiVuHRBAaUFoJXSB5EYdWSeQAuYjf1o3iAyheRy59Vgen9BPP5yUbBQP8l+jkOq4Lw5/itqHMaVh5QQTisvm71YX+OHlBB+HP8VtQ5DSsPqCAcVl+3+rA/Rw+oIPxxvhXVquqBXfaACsJddpWqqHrgx/HA/wEAAP//u8VQUwAAAAZJREFUAwDa3g1DIudEzgAAAABJRU5ErkJggg==';
+
+var todasCotizaciones=[];
+
+// ============================================================
+// ===================== ENLACE DE CLIENTE ====================
+// ============================================================
+function normalizar(str){
+  return (str||'').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ');
+}
+function normalizarTel(tel){
+  return (tel||'').toString().replace(/\D/g,'');
+}
+
+// Determina si dos cotizaciones pertenecen al mismo cliente.
+// Empresarial: RUC primero, luego nombre de empresa.
+// Persona (Residencial/PH): Teléfono primero, luego nombre completo.
+// Nunca cruza Persona con Empresa.
+function mismoCliente(qa,qb){
+  var aEmp=qa.cliente_tipo==='empresarial', bEmp=qb.cliente_tipo==='empresarial';
+  if(aEmp!==bEmp) return false;
+
+  if(aEmp){
+    var rucA=normalizar(qa.cliente_ruc), rucB=normalizar(qb.cliente_ruc);
+    if(rucA&&rucB) return rucA===rucB;
+    var empA=normalizar(qa.cliente_empresa), empB=normalizar(qb.cliente_empresa);
+    return !!empA && empA===empB;
+  } else {
+    var telA=normalizarTel(qa.cliente_telefono), telB=normalizarTel(qb.cliente_telefono);
+    if(telA&&telB&&telA.length>=7) return telA===telB;
+    var nomA=normalizar(qa.cliente_nombre), nomB=normalizar(qb.cliente_nombre);
+    return !!nomA && nomA===nomB;
+  }
+}
+
+function buscarHistorialCliente(q,excluirId){
+  var exId=excluirId!==undefined?excluirId:q.id;
+  return todasCotizaciones.filter(function(o){ return o.id!==exId && mismoCliente(q,o); });
+}
+
+function nombreCliente(q){
+  return q.cliente_tipo==='empresarial' ? (q.cliente_empresa||q.cliente_nombre||'Sin nombre') : (q.cliente_nombre||'Sin nombre');
+}
+
+// ============================================================
+// ============== TIMELINE HORIZONTAL COMPACTA =================
+// ============================================================
+function fechaCorta(iso){
+  if(!iso) return '';
+  var d=new Date(iso);
+  return d.toLocaleDateString('es-PA',{day:'2-digit',month:'short'});
+}
+
+function renderTimelineCotizacion(q){
+  var pasos=[];
+  pasos.push({lbl:'Cotizada',fecha:q.fecha_cotizado||q.fecha_creacion,cancel:false});
+  if(q.estado==='aprobada'||q.estado==='pagada'||(q.estado==='cancelada'&&q.fecha_aprobada)){
+    pasos.push({lbl:'Aprobada',fecha:q.fecha_aprobada,cancel:false});
+  }
+  if(q.estado==='pagada'){
+    pasos.push({lbl:'Pagada',fecha:q.fecha_pagada,cancel:false});
+  }
+  if(q.estado==='cancelada'){
+    pasos.push({lbl:'Cancelada',fecha:q.fecha_cancelada,cancel:true});
+  }
+
+  var badgeColor=q.estado==='pagada'?'#2D6A4F':q.estado==='aprobada'?'#40916C':q.estado==='cancelada'?'#DC2626':'#94A3B8';
+  var badgeTxt={pendiente:'Pendiente',cotizado:'Cotizado',aprobada:'✅ Aprobada',pagada:'💰 Pagada',cancelada:'❌ Cancelada'}[q.estado]||q.estado;
+
+  var h='<div class="tl-card">';
+  h+='<div class="tl-info"><span class="num">'+(q.numero_cot||'')+'</span><span class="fecha">'+nombreCliente(q)+'</span></div>';
+  h+='<div class="tl-hline">';
+  for(var i=0;i<pasos.length;i++){
+    var p=pasos[i];
+    h+='<div class="tl-item">';
+    h+='<div class="tl-dot'+(p.cancel?' cancel':'')+'"></div>';
+    h+='<div class="tl-lbl'+(p.cancel?' cancel':'')+'">'+p.lbl+'</div>';
+    h+='<div class="tl-fecha-sm">'+fechaCorta(p.fecha)+'</div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  h+='<span class="tl-badge" style="background:'+badgeColor+';color:white">'+badgeTxt+'</span>';
+  if(q.estado==='cancelada'&&q.motivo_cancelacion){
+    h+='<div class="tl-motivo">↳ Motivo: '+q.motivo_cancelacion+'</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+// Expediente del cliente — aparece dentro del detalle de una cotización
+// Extrae los ítems (servicio + precio) de una cotización ya cotizada, para mostrar en el detalle del historial
+function extraerItemsCotizacion(q){
+  var items=[];
+  var servicios=q.servicios||[];
+  var precios=q.precios_detalle||{};
+  for(var si=0;si<servicios.length;si++){
+    var lines=servicios[si].split('\n');
+    var svcName=lines[0].replace(':','');
+    for(var li=1;li<lines.length;li++){
+      if(!lines[li].trim()) continue;
+      var itemKey=si+'_'+li;
+      var precio=precios[itemKey]!==undefined?precios[itemKey]:0;
+      items.push({svc:svcName,desc:lines[li].replace(/^\s*\d+\.\s*/,''),precio:precio});
+    }
+  }
+  return items;
+}
+
+// Tarjeta de historial clickeable — al tocarla despliega el detalle de esa cotización pasada
+function renderTimelineCardClickable(q,uid){
+  var pasos=[];
+  pasos.push({lbl:'Cotizada',fecha:q.fecha_cotizado||q.fecha_creacion,cancel:false});
+  if(q.estado==='aprobada'||q.estado==='pagada'||(q.estado==='cancelada'&&q.fecha_aprobada)){
+    pasos.push({lbl:'Aprobada',fecha:q.fecha_aprobada,cancel:false});
+  }
+  if(q.estado==='pagada'){
+    pasos.push({lbl:'Pagada',fecha:q.fecha_pagada,cancel:false});
+  }
+  if(q.estado==='cancelada'){
+    pasos.push({lbl:'Cancelada',fecha:q.fecha_cancelada,cancel:true});
+  }
+
+  var badgeColor=q.estado==='pagada'?'#2D6A4F':q.estado==='aprobada'?'#40916C':q.estado==='cancelada'?'#DC2626':'#94A3B8';
+  var badgeTxt={pendiente:'Pendiente',cotizado:'Cotizado',aprobada:'✅ Aprobada',pagada:'💰 Pagada',cancelada:'❌ Cancelada'}[q.estado]||q.estado;
+
+  var h='<div class="tl-mini" id="tlmini-'+uid+'" onclick="toggleTlMini(\''+uid+'\')">';
+  h+='<div class="num-row"><span class="num">'+(q.numero_cot||'')+'</span><span class="expand-ico" id="tlicon-'+uid+'">▸</span></div>';
+  h+='<span class="fecha-mini">'+fechaCorta(q.fecha_creacion)+'</span>';
+  h+='<div class="tl-dots">';
+  for(var i=0;i<pasos.length;i++){
+    var p=pasos[i];
+    h+='<div class="tl-item">';
+    h+='<div class="tl-dot'+(p.cancel?' cancel':'')+'"></div>';
+    h+='<div class="tl-lbl'+(p.cancel?' cancel':'')+'">'+p.lbl+'</div>';
+    h+='<div class="tl-fecha-sm">'+fechaCorta(p.fecha)+'</div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  h+='<span class="tl-badge" style="background:'+badgeColor+';color:white">'+badgeTxt+'</span>';
+  if(q.estado==='cancelada'&&q.motivo_cancelacion){
+    h+='<div style="font-size:9px;color:#991B1B;margin-top:4px">↳ Motivo: '+q.motivo_cancelacion+'</div>';
+  }
+
+  // Detalle expandible con los ítems de esa cotización pasada
+  var items=extraerItemsCotizacion(q);
+  h+='<div class="tl-detail">';
+  for(var ii=0;ii<items.length;ii++){
+    h+='<div class="tl-old-item"><div><span class="svc-tag">'+items[ii].svc+'</span>'+items[ii].desc+'</div><div class="price">$'+items[ii].precio.toFixed(2)+'</div></div>';
+  }
+  var totalHist=(q.total!==undefined&&q.total!==null)?q.total:items.reduce(function(s,it){return s+it.precio;},0);
+  h+='<div class="tl-old-total"><span>Total</span><span>$'+parseFloat(totalHist).toFixed(2)+'</span></div>';
+  h+='</div>'; // /tl-detail
+
+  h+='</div>'; // /tl-mini
+  return h;
+}
+
+function toggleTlMini(uid){
+  var card=document.getElementById('tlmini-'+uid);
+  var icon=document.getElementById('tlicon-'+uid);
+  if(!card) return;
+  var open=card.classList.toggle('expanded');
+  if(icon) icon.textContent=open?'▾':'▸';
+}
+
+// ============================================================
+// ============== DETECCIÓN CLIENTE RECURRENTE =================
+// ============================================================
+// Alerta si el cliente marcó "Nuevo" en el formulario pero ya tiene
+// historial de cotizaciones aprobadas/pagadas previas.
+function detectarAlertaRecurrente(q){
+  if(!q.cliente_nuevo) return null;
+  var historial=buscarHistorialCliente(q).filter(function(o){
+    return (o.estado==='aprobada'||o.estado==='pagada') && new Date(o.fecha_creacion)<new Date(q.fecha_creacion);
+  });
+  if(historial.length===0) return null;
+  return historial.length;
+}
+
+// ============================================================
+// ========================= DIRECTORIO =========================
+// ============================================================
+function construirDirectorio(){
+  var grupos=[];
+  todasCotizaciones.forEach(function(q){
+    var grupo=grupos.find(function(g){ return mismoCliente(g.rep,q); });
+    if(grupo){
+      grupo.cotizaciones.push(q);
+    } else {
+      grupos.push({rep:q,cotizaciones:[q]});
+    }
+  });
+  // Ordenar alfabéticamente por nombre del cliente
+  grupos.sort(function(a,b){
+    return nombreCliente(a.rep).localeCompare(nombreCliente(b.rep),'es');
+  });
+  return grupos;
+}
+
+function renderDirectorio(){
+  var cont=document.getElementById('directorioLista');
+  var busqueda=normalizar((document.getElementById('dirSearch')||{}).value||'');
+  var grupos=construirDirectorio();
+
+  if(busqueda){
+    grupos=grupos.filter(function(g){
+      var q=g.rep;
+      return normalizar(nombreCliente(q)).indexOf(busqueda)>-1 ||
+             normalizarTel(q.cliente_telefono).indexOf(busqueda.replace(/\D/g,''))>-1 ||
+             normalizar(q.cliente_ruc).indexOf(busqueda)>-1;
+    });
+  }
+
+  if(grupos.length===0){
+    cont.innerHTML='<div class="empty-state"><div class="ico">📇</div>No hay clientes'+(busqueda?' que coincidan con la búsqueda':'')+'.</div>';
+    return;
+  }
+
+  // Agrupar por primera letra del nombre (estilo directorio telefónico)
+  var porLetra={};
+  var letras=[];
+  grupos.forEach(function(g){
+    var nom=nombreCliente(g.rep);
+    var letra=normalizar(nom).charAt(0).toUpperCase()||'#';
+    if(!porLetra[letra]){ porLetra[letra]=[]; letras.push(letra); }
+    porLetra[letra].push(g);
+  });
+  letras.sort();
+
+  // Si hay búsqueda activa, expandir todas las letras automáticamente
+  var forzarAbierto=!!busqueda;
+
+  var h='';
+  letras.forEach(function(letra){
+    var clientes=porLetra[letra];
+    h+='<div class="dir-letra-group">';
+    h+='<div class="dir-letra-header" onclick="toggleLetraDir(\''+letra+'\')" id="letraHead-'+letra+'">';
+    h+='<span class="dir-letra-badge">'+letra+'</span>';
+    h+='<span class="dir-letra-count">'+clientes.length+' cliente'+(clientes.length===1?'':'s')+'</span>';
+    h+='<span class="dir-letra-chev" id="letraChev-'+letra+'">'+(forzarAbierto?'▾':'▸')+'</span>';
+    h+='</div>';
+    h+='<div class="dir-letra-body'+(forzarAbierto?' show':'')+'" id="letraBody-'+letra+'">';
+
+    clientes.forEach(function(g){
+      var q=g.rep;
+      var esEmp=q.cliente_tipo==='empresarial';
+      var aprobadas=g.cotizaciones.filter(function(o){return o.estado==='aprobada';}).length;
+      var pagadas=g.cotizaciones.filter(function(o){return o.estado==='pagada';}).length;
+      var canceladas=g.cotizaciones.filter(function(o){return o.estado==='cancelada';}).length;
+      var uid='dc-'+(q.id||Math.random());
+
+      h+='<div class="dir-entry">';
+      h+='<div class="dir-entry-name" onclick="toggleClienteDir(\''+uid+'\')">';
+      h+='<span>'+nombreCliente(q)+'</span>';
+      h+='<span class="dir-entry-chev" id="chev-'+uid+'">▸</span>';
+      h+='</div>';
+      h+='<div class="dir-entry-body" id="body-'+uid+'">';
+      h+='<div class="dir-sub">'+(esEmp?'🏢 Empresa'+(q.cliente_ruc?' · RUC '+q.cliente_ruc:''):(q.cliente_ph?'🏘️ '+q.cliente_ph:(q.cliente_tipo||'')))+'</div>';
+      if(q.cliente_telefono) h+='<div class="dir-row"><span class="ico">📱</span>'+q.cliente_telefono+'</div>';
+      if(q.cliente_email) h+='<div class="dir-row"><span class="ico">📧</span>'+q.cliente_email+'</div>';
+      h+='<div class="dir-stats">';
+      h+='<div class="dir-stat"><div class="n">'+g.cotizaciones.length+'</div><div class="l">Total</div></div>';
+      h+='<div class="dir-stat"><div class="n" style="color:#40916C">'+aprobadas+'</div><div class="l">Aprob.</div></div>';
+      h+='<div class="dir-stat"><div class="n" style="color:#2D6A4F">'+pagadas+'</div><div class="l">Pagadas</div></div>';
+      h+='<div class="dir-stat"><div class="n" style="color:#DC2626">'+canceladas+'</div><div class="l">Cancel.</div></div>';
+      h+='</div>';
+      h+='</div>'; // /dir-entry-body
+      h+='</div>'; // /dir-entry
+    });
+
+    h+='</div>'; // /dir-letra-body
+    h+='</div>'; // /dir-letra-group
+  });
+  cont.innerHTML=h;
+}
+
+function toggleLetraDir(letra){
+  var head=document.getElementById('letraHead-'+letra);
+  var body=document.getElementById('letraBody-'+letra);
+  var chev=document.getElementById('letraChev-'+letra);
+  if(!body) return;
+  var open=body.classList.toggle('show');
+  if(chev) chev.textContent=open?'▾':'▸';
+}
+
+function toggleClienteDir(uid){
+  var body=document.getElementById('body-'+uid);
+  var chev=document.getElementById('chev-'+uid);
+  if(!body) return;
+  var open=body.classList.toggle('show');
+  if(chev) chev.textContent=open?'▾':'▸';
+}
+
+// ============================================================
+// ==================== CAMBIO DE ESTADO ========================
+// ============================================================
+var cancelandoId=null;
+
+function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ===================== REALIZAR CAMBIOS (agregar/quitar servicios e ítems) =====================
+var _editState={}; // { [id]: {orden:[svcName,...], items:{svcName:[texto,...]}} }
+
+function iniciarEdicionServicios(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  var estado={orden:[],items:{}};
+  (q.servicios||[]).forEach(function(bloque){
+    var lines=bloque.split('\n');
+    var svcName=lines[0].replace(':','').trim();
+    if(!estado.items[svcName]){ estado.items[svcName]=[]; estado.orden.push(svcName); }
+    for(var i=1;i<lines.length;i++){
+      if(lines[i].trim()) estado.items[svcName].push(lines[i].replace(/^\s*\d+\.\s*/,''));
+    }
+  });
+  _editState[id]=estado;
+}
+
+function toggleRealizarCambios(id){
+  var box=document.getElementById('editorCambios-'+id);
+  if(!box) return;
+  var showing=box.style.display!=='none';
+  if(showing){
+    box.style.display='none';
+    delete _editState[id];
+  } else {
+    iniciarEdicionServicios(id);
+    box.style.display='block';
+    renderEditorCambios(id);
+  }
+}
+
+function renderEditorCambios(id){
+  var estado=_editState[id];
+  if(!estado) return;
+  var box=document.getElementById('editorCambios-'+id);
+
+  var h='<div style="background:#F7F9F8;border:1.5px solid #D8F3DC;border-radius:12px;padding:14px;margin-top:12px">';
+  h+='<div style="font-size:12px;font-weight:800;color:#1B4332;margin-bottom:10px">🔧 Realizar Cambios — Servicios y Ítems</div>';
+
+  if(estado.orden.length===0){
+    h+='<div style="font-size:11px;color:#a0aec0;margin-bottom:10px">Sin servicios — agrega al menos uno abajo.</div>';
+  }
+
+  estado.orden.forEach(function(svcName){
+    var items=estado.items[svcName];
+    if(!items||items.length===0) return;
+    h+='<div style="margin-bottom:10px">';
+    h+='<div style="font-size:10.5px;font-weight:800;color:#2D6A4F;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;gap:8px">';
+    h+='<span>'+esc(svcName)+'</span>';
+    h+='<span style="color:#DC2626;font-size:9.5px;cursor:pointer;font-weight:700;white-space:nowrap" onclick="quitarServicioCambio('+id+',\''+esc(svcName).replace(/'/g,"\\'")+'\')">🗑️ Quitar servicio</span>';
+    h+='</div>';
+    items.forEach(function(texto,idx){
+      h+='<div style="display:flex;align-items:center;gap:8px;background:white;border-radius:7px;padding:7px 10px;margin-bottom:4px;font-size:11px;color:#4a5568">';
+      h+='<span style="flex:1">'+esc(texto)+'</span>';
+      h+='<span style="color:#DC2626;font-weight:900;cursor:pointer" onclick="quitarItemCambio('+id+',\''+esc(svcName).replace(/'/g,"\\'")+'\','+idx+')">✕</span>';
+      h+='</div>';
+    });
+    h+='</div>';
+  });
+
+  h+='<div style="border-top:1px dashed #D8F3DC;padding-top:10px;margin-top:6px">';
+  h+='<div style="font-size:10.5px;font-weight:800;color:#2D6A4F;margin-bottom:8px">➕ Agregar Ítem</div>';
+  h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Servicio</label>';
+  h+='<select id="nuevoSvc-'+id+'" onchange="renderCamposDinamicos('+id+')" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px">';
+  Object.keys(TIPOS_MAP).sort(function(a,b){return TIPOS_MAP[a].nombre.localeCompare(TIPOS_MAP[b].nombre,'es');}).forEach(function(k){
+    h+='<option value="'+k+'">'+esc(TIPOS_MAP[k].nombre)+'</option>';
+  });
+  h+='</select></div>';
+  h+='<div id="camposDinamicos-'+id+'"></div>';
+  h+='<button onclick="agregarItemCambio('+id+')" style="width:100%;background:#40916C;color:white;border:none;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;cursor:pointer;margin-top:8px">➕ Agregar Ítem</button>';
+  h+='</div>';
+
+  h+='<div style="display:flex;gap:8px;margin-top:14px">';
+  h+='<button onclick="guardarCambiosServicios('+id+')" style="flex:1;background:#2D6A4F;color:white;border:none;border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">💾 Guardar Cambios</button>';
+  h+='<button onclick="toggleRealizarCambios('+id+')" style="flex:1;background:white;color:#718096;border:1.5px solid #e2e8f0;border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>';
+  h+='</div>';
+
+  h+='</div>';
+  box.innerHTML=h;
+  renderCamposDinamicos(id);
+}
+
+// Construye los campos específicos según el servicio elegido (igual criterio que el formulario del cliente)
+function renderCamposDinamicos(id){
+  var svcSel=document.getElementById('nuevoSvc-'+id);
+  var cont=document.getElementById('camposDinamicos-'+id);
+  if(!svcSel||!cont) return;
+  var svcKey=svcSel.value;
+  var cfg=SVC_CAMPOS[svcKey]||{};
+  var tipos=TIPOS_MAP[svcKey]?TIPOS_MAP[svcKey].tipos:[];
+
+  var h='';
+
+  // Tipo (siempre, salvo Limpieza Hogar que es fijo)
+  if(svcKey==='hogar'){
+    h+='<input type="hidden" id="nuevoTipo-'+id+'" value="Limpieza Profunda">';
+  } else {
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Tipo</label>';
+    h+='<select id="nuevoTipo-'+id+'"'+(svcKey==='persianas'?' onchange="actualizarMedidaPersiana('+id+')"':'')+' style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px">';
+    tipos.forEach(function(t){ h+='<option value="'+esc(t)+'">'+esc(t)+'</option>'; });
+    h+='</select></div>';
+  }
+
+  // Tamaño/Modelo (Colchones)
+  if(cfg.hasTamañoModelo){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Tamaño / Modelo</label>';
+    h+='<select id="nuevoTamMod-'+id+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"><option value="">— Seleccione —</option>';
+    cfg.tamaños.forEach(function(t){ h+='<option>'+esc(t)+'</option>'; });
+    h+='</select></div>';
+  }
+
+  // Forma (Alfombras)
+  if(cfg.hasForma){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Forma</label>';
+    h+='<select id="nuevoForma-'+id+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"><option value="">— Seleccione —</option>';
+    cfg.formas.forEach(function(f){ h+='<option>'+esc(f)+'</option>'; });
+    h+='</select></div>';
+  }
+
+  // Cantidad + N° Puestos (Sofás) o Cantidad sola (Colchones, Persianas, Electro)
+  if(cfg.hasCant){
+    h+='<div style="display:flex;gap:6px;margin-bottom:8px">';
+    h+='<div class="field" style="flex:1"><label class="lbl" style="font-size:10px">Cantidad</label>';
+    h+='<input type="number" id="nuevoCant-'+id+'" value="1" min="1" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"></div>';
+    if(cfg.hasPuestos){
+      h+='<div class="field" style="flex:1"><label class="lbl" style="font-size:10px">N° Puestos</label>';
+      h+='<select id="nuevoPuestos-'+id+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px">';
+      cfg.puestos.forEach(function(p){ h+='<option>'+esc(p)+'</option>'; });
+      h+='</select></div>';
+    }
+    h+='</div>';
+  }
+
+  // Área m² (Pisos, Pulido, Alfombras, Hogar, Comercial)
+  if(cfg.hasArea){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Área (m²)</label>';
+    h+='<input type="number" id="nuevoArea-'+id+'" placeholder="Ej: 50" min="0" step="0.5" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"></div>';
+  }
+
+  // Medidas L x A (Persianas)
+  if(cfg.hasMedidas){
+    var tipoActual=tipos[0]||'';
+    var medidasIniciales=MEDIDAS_PERSIANAS[tipoActual]||[];
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Medida (Largo x Ancho)</label>';
+    h+='<select id="nuevoMedidas-'+id+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px">';
+    medidasIniciales.forEach(function(m){ h+='<option>'+esc(m)+'</option>'; });
+    h+='</select></div>';
+  }
+
+  // Ubicación (Persianas) — checkboxes múltiples
+  if(cfg.hasUbicacion){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Ubicación</label>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    cfg.ubicaciones.forEach(function(u,i){
+      h+='<label style="display:flex;align-items:center;gap:3px;font-size:10px;background:#F7F9F8;border-radius:6px;padding:4px 7px;cursor:pointer">';
+      h+='<input type="checkbox" class="ubic-check-'+id+'" value="'+esc(u)+'" style="width:12px;height:12px">'+esc(u)+'</label>';
+    });
+    h+='</div></div>';
+  }
+
+  // Tela/Color (Persianas)
+  if(cfg.hasTelColor){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Tela / Color</label>';
+    h+='<select id="nuevoColor-'+id+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"><option value="">— Seleccione —</option>';
+    cfg.colores.forEach(function(c){ h+='<option>'+esc(c)+'</option>'; });
+    h+='<option>Otro</option></select></div>';
+  }
+
+  // Tipo de limpieza (Comercial)
+  if(cfg.hasLimpType){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Tipo de Limpieza</label>';
+    h+='<select id="nuevoLimpType-'+id+'" style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"><option>Recurrente</option><option>Profunda</option></select></div>';
+  }
+
+  // Nivel de suciedad / estado actual (todos los servicios)
+  if(cfg.hasNivel){
+    h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Estado Actual / Nivel de Suciedad</label>';
+    h+='<div style="display:flex;gap:6px" id="nivelDots-'+id+'">';
+    NIVELES_SUCIEDAD.forEach(function(n,i){
+      h+='<div class="nivel-dot-cambio" data-lv="'+(i+1)+'" title="'+n+'" onclick="selNivelCambio('+id+',this)" style="width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;background:'+NIVEL_COLORES[i]+'"></div>';
+    });
+    h+='</div></div>';
+  }
+
+  // Detalle adicional (siempre disponible, texto libre)
+  h+='<div class="field" style="margin-bottom:8px"><label class="lbl" style="font-size:10px">Detalle adicional (opcional)</label>';
+  h+='<input type="text" id="nuevoDetalle-'+id+'" placeholder="Cualquier otra nota..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px"></div>';
+
+  cont.innerHTML=h;
+}
+
+function actualizarMedidaPersiana(id){
+  var tipoSel=document.getElementById('nuevoTipo-'+id);
+  var medSel=document.getElementById('nuevoMedidas-'+id);
+  if(!tipoSel||!medSel) return;
+  var medidas=MEDIDAS_PERSIANAS[tipoSel.value]||[];
+  medSel.innerHTML=medidas.map(function(m){return '<option>'+m+'</option>';}).join('');
+}
+
+function selNivelCambio(id,dot){
+  var cont=document.getElementById('nivelDots-'+id);
+  if(!cont) return;
+  cont.querySelectorAll('.nivel-dot-cambio').forEach(function(d){ d.style.borderColor='transparent'; d.classList.remove('sel'); });
+  dot.style.borderColor='#1B4332';
+  dot.classList.add('sel');
+}
+
+
+function agregarItemCambio(id){
+  var estado=_editState[id];
+  if(!estado) return;
+  var svcKey=document.getElementById('nuevoSvc-'+id).value;
+  var cfg=SVC_CAMPOS[svcKey]||{};
+  var svcName=TIPOS_MAP[svcKey].nombre;
+  var tipoEl=document.getElementById('nuevoTipo-'+id);
+  var tipo=tipoEl?tipoEl.value:'';
+
+  var partes=[tipo];
+
+  // Cantidad
+  if(cfg.hasCant){
+    var cantEl=document.getElementById('nuevoCant-'+id);
+    var cant=cantEl?(parseInt(cantEl.value)||1):1;
+    partes.push('x'+cant);
+  }
+
+  // Tamaño/Modelo (Colchones)
+  if(cfg.hasTamañoModelo){
+    var tamEl=document.getElementById('nuevoTamMod-'+id);
+    if(tamEl&&tamEl.value) partes.push(tamEl.value);
+  }
+
+  // Forma (Alfombras)
+  if(cfg.hasForma){
+    var formaEl=document.getElementById('nuevoForma-'+id);
+    if(formaEl&&formaEl.value) partes.push(formaEl.value);
+  }
+
+  // N° Puestos (Sofás)
+  if(cfg.hasPuestos){
+    var puestosEl=document.getElementById('nuevoPuestos-'+id);
+    if(puestosEl&&puestosEl.value) partes.push(puestosEl.value);
+  }
+
+  // Área m²
+  if(cfg.hasArea){
+    var areaEl=document.getElementById('nuevoArea-'+id);
+    if(areaEl&&areaEl.value) partes.push(areaEl.value+' m²');
+  }
+
+  // Medidas L x A (Persianas)
+  if(cfg.hasMedidas){
+    var medEl=document.getElementById('nuevoMedidas-'+id);
+    if(medEl&&medEl.value.trim()){
+      var val=medEl.value.trim();
+      partes.push(/cm/i.test(val)?val:val+' cm');
+    }
+  }
+
+  // Ubicación (checkboxes, Persianas)
+  if(cfg.hasUbicacion){
+    var ubicChecks=document.querySelectorAll('.ubic-check-'+id+':checked');
+    var ubics=Array.from(ubicChecks).map(function(c){return c.value;});
+    if(ubics.length) partes.push('📍 '+ubics.join(', '));
+  }
+
+  // Tela/Color (Persianas)
+  if(cfg.hasTelColor){
+    var colorEl=document.getElementById('nuevoColor-'+id);
+    if(colorEl&&colorEl.value) partes.push('🎨 '+colorEl.value);
+  }
+
+  // Tipo de limpieza (Comercial)
+  if(cfg.hasLimpType){
+    var limpEl=document.getElementById('nuevoLimpType-'+id);
+    if(limpEl&&limpEl.value) partes.push(limpEl.value);
+  }
+
+  // Detalle libre
+  var detalleEl=document.getElementById('nuevoDetalle-'+id);
+  if(detalleEl&&detalleEl.value.trim()) partes.push(detalleEl.value.trim());
+
+  // Nivel de suciedad (siempre al final, como en el resto del sistema)
+  if(cfg.hasNivel){
+    var dotSel=document.querySelector('#nivelDots-'+id+' .nivel-dot-cambio.sel');
+    if(dotSel) partes.push('Nivel:'+dotSel.getAttribute('title'));
+  }
+
+  var texto=partes.join(' | ');
+
+  if(!estado.items[svcName]){ estado.items[svcName]=[]; estado.orden.push(svcName); }
+  estado.items[svcName].push(texto);
+
+  // Limpiar formulario y refrescar lista de ítems ya agregados
+  renderEditorCambios(id);
+  toast('✅ Ítem agregado — recuerda tocar "Guardar Cambios"');
+}
+
+function quitarItemCambio(id,svcName,idx){
+  var estado=_editState[id];
+  if(!estado||!estado.items[svcName]) return;
+  estado.items[svcName].splice(idx,1);
+  if(estado.items[svcName].length===0){
+    delete estado.items[svcName];
+    estado.orden=estado.orden.filter(function(s){return s!==svcName;});
+  }
+  renderEditorCambios(id);
+}
+
+function quitarServicioCambio(id,svcName){
+  var estado=_editState[id];
+  if(!estado) return;
+  if(!confirm('¿Quitar todo el servicio "'+svcName+'" y sus ítems?')) return;
+  delete estado.items[svcName];
+  estado.orden=estado.orden.filter(function(s){return s!==svcName;});
+  renderEditorCambios(id);
+}
+
+async function guardarCambiosServicios(id){
+  var estado=_editState[id];
+  if(!estado) return;
+  if(estado.orden.length===0){ toast('⚠️ Debe quedar al menos un servicio'); return; }
+
+  var nuevoServiciosArray=estado.orden.map(function(svcName){
+    var lines=estado.items[svcName].map(function(texto,idx){ return (idx+1)+'. '+texto; });
+    return svcName+':\n'+lines.join('\n');
+  });
+
+  try{
+    var s=getSupa();
+    var {error}=await s.from('cotizaciones').update({servicios:nuevoServiciosArray}).eq('id',id);
+    if(error) throw error;
+    var q=todasCotizaciones.find(function(x){return x.id===id;});
+    if(q) q.servicios=nuevoServiciosArray;
+    delete _editState[id];
+    toast('✅ Cambios guardados correctamente');
+    renderQuoteDetail(id);
+  } catch(e){ toast('❌ Error: '+e.message); }
+}
+
+async function modificarCotizacion(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  if(!confirm('¿Regresar esta cotización a "Pendientes" para modificarla? Los precios que ya pusiste se conservan, pero deberás revisarlos y volver a guardar.')) return;
+  try{
+    var s=getSupa();
+    var {error}=await s.from('cotizaciones').update({estado:'pendiente'}).eq('id',id);
+    if(error) throw error;
+    q.estado='pendiente';
+    q.fecha_creacion=q.fecha_creacion; // se conserva la fecha original de creación (no reinicia el conteo de 12h)
+    toast('✏️ Cotización movida a Pendientes para modificar');
+    revisarPendientesVencidos();
+    var chipPendiente=document.querySelector('.filter-chip[data-estado="pendiente"]');
+    if(chipPendiente) filtrarEstado(chipPendiente,'pendiente');
+    else renderCotizaciones();
+    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
+  } catch(e){ toast('❌ Error: '+e.message); }
+}
+
+async function marcarAprobada(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  try{
+    var s=getSupa();
+    if(q.enviado_cliente){
+      // Ya se envió antes — aprobar de una vez
+      var {error}=await s.from('cotizaciones').update({estado:'aprobada',fecha_aprobada:new Date().toISOString()}).eq('id',id);
+      if(error) throw error;
+      q.estado='aprobada'; q.fecha_aprobada=new Date().toISOString();
+      toast('✅ Cotización marcada como Aprobada');
+      var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
+      if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
+    } else {
+      // Aún no se ha enviado al cliente — queda pendiente hasta que se envíe
+      var {error}=await s.from('cotizaciones').update({aprobacion_pendiente:true}).eq('id',id);
+      if(error) throw error;
+      q.aprobacion_pendiente=true;
+      toast('✅ Aprobación registrada — se confirmará cuando envíes la cotización al cliente');
+      renderCotizaciones();
+    }
+    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
+  } catch(e){ toast('❌ Error: '+e.message); }
+}
+
+async function marcarPagada(id){
+  try{
+    var s=getSupa();
+    var {error}=await s.from('cotizaciones').update({estado:'pagada',fecha_pagada:new Date().toISOString()}).eq('id',id);
+    if(error) throw error;
+    var q=todasCotizaciones.find(function(x){return x.id===id;});
+    if(q){ q.estado='pagada'; q.fecha_pagada=new Date().toISOString(); }
+    toast('💰 Cotización marcada como Pagada');
+    renderCotizaciones();
+    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id);} },100);
+  } catch(e){ toast('❌ Error: '+e.message); }
+}
+
+function abrirModalCancelar(id){
+  cancelandoId=id;
+  document.getElementById('motivoCancelSelect').value='';
+  document.getElementById('motivoCancelOtro').value='';
+  document.getElementById('motivoCancelOtro').style.display='none';
+  document.getElementById('modalCancelar').classList.add('show');
+}
+function cerrarModalCancelar(){
+  document.getElementById('modalCancelar').classList.remove('show');
+  cancelandoId=null;
+}
+function toggleMotivoOtro(){
+  var sel=document.getElementById('motivoCancelSelect').value;
+  document.getElementById('motivoCancelOtro').style.display=sel==='Otro'?'block':'none';
+}
+async function confirmarCancelacion(){
+  if(!cancelandoId) return;
+  var sel=document.getElementById('motivoCancelSelect').value;
+  if(!sel){ toast('⚠️ Selecciona un motivo'); return; }
+  var motivo=sel==='Otro'?(document.getElementById('motivoCancelOtro').value.trim()||'Otro'):sel;
+  var id=cancelandoId;
+  try{
+    var s=getSupa();
+    var {error}=await s.from('cotizaciones').update({estado:'cancelada',fecha_cancelada:new Date().toISOString(),motivo_cancelacion:motivo}).eq('id',id);
+    if(error) throw error;
+    var q=todasCotizaciones.find(function(x){return x.id===id;});
+    if(q){ q.estado='cancelada'; q.fecha_cancelada=new Date().toISOString(); q.motivo_cancelacion=motivo; }
+    toast('❌ Cotización cancelada — movida a Orden Eliminada');
+    cerrarModalCancelar();
+    var chipCancelada=document.querySelector('.filter-chip[data-estado="cancelada"]');
+    if(chipCancelada) filtrarEstado(chipCancelada,'cancelada');
+    else renderCotizaciones();
+    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
+  } catch(e){ toast('❌ Error: '+e.message); }
+}
+
+
+var preciosAreaCache={}; // key: servicio_key+'||'+tipo_key -> precio_m2
+// Servicios que usan precio por m² (área o medida)
+var SVCS_AREA={
+  pisos:{label:'Tipo de Piso',porTipo:true},
+  pulido:{label:'Tipo de Piso',porTipo:true},
+  alfombras:{label:'Tipo de Alfombra',porTipo:true},
+  comercial:{label:'Tipo de Local',porTipo:true},
+  hogar:{label:'Limpieza Profunda (precio general)',porTipo:false},
+  persianas:{label:'Tipo de Persiana/Cortina',porTipo:true,unidad:'por ventana (largo×ancho en m²)'}
+};
+var preciosTipoCache={}; // key: servicio_key+'||'+tipoKey -> precio
+var filtroActual='pendiente';
+
+// Extrae la parte de la línea relevante para el precio (tipo, forma, medida, cantidad)
+// excluyendo nivel de suciedad y motivos (que no afectan el costo del servicio)
+function parseTipoKey(line){
+  var clean=line.replace(/^\s*\d+\.\s*/,'');
+  var parts=clean.split(' | ');
+  var keep=[];
+  for(var i=0;i<parts.length;i++){
+    var parte=parts[i].trim();
+    if(parte.indexOf('Nivel:')===0) break;
+    if(/^x\d+$/i.test(parte)) continue; // la cantidad NO debe afectar el precio unitario/m² — se omite de la llave
+    keep.push(parte);
+  }
+  return keep.join(' · ');
+}
+
+// ===================== EXPORTAR EXCEL =====================
+var SERVICIOS_SIN_CANTIDAD_REAL=['comercial','hogar','pisos','pulido','alfombras']; // se cuenta como 1 servicio
+
+var ESTADO_EXCEL={pendiente:'Pendiente',cotizado:'Esperando Respuesta',aprobada:'Aprobada',pagada:'Pagada',cancelada:'Cancelada'};
+
+function exportarExcel(){
+  if(typeof XLSX==='undefined'){ toast('❌ Librería Excel no cargó. Revisa tu conexión a internet.'); return; }
+  var filas=[];
+
+  todasCotizaciones.forEach(function(q){
+    var servicios=q.servicios||[];
+    var precios=q.precios_detalle||{};
+    var esEmpresa=q.cliente_tipo==='empresarial';
+    var lugar=esEmpresa?(q.cliente_empresa||''):(q.cliente_ph||'');
+    var tipoClienteEstado=q.cliente_recurrente?'Recurrente':'Nuevo';
+    var fechaStr=q.fecha_creacion?new Date(q.fecha_creacion).toLocaleDateString('es-PA'):'';
+
+    if(servicios.length===0){
+      // Cotización sin servicios detallados aún (poco común, pero se incluye igual)
+      filas.push({
+        'No. de Cotización':q.numero_cot||'',
+        'Estatus':ESTADO_EXCEL[q.estado]||q.estado,
+        'Fecha':fechaStr,
+        'Cliente (Contacto)':nombreCliente(q),
+        'Tipo de Cliente':q.cliente_tipo||'',
+        'Lugar':lugar,
+        'Condición del Cliente':tipoClienteEstado,
+        'Servicio Solicitado':'',
+        'Tipo de Servicio Solicitado':'',
+        'Cantidad':'',
+        'Monto':0
+      });
+      return;
+    }
+
+    servicios.forEach(function(servicioTexto,si){
+      var lines=servicioTexto.split('\n');
+      var svcName=lines[0].replace(':','').trim();
+      var svcKey=Object.keys(TIPOS_MAP).find(function(k){return TIPOS_MAP[k].nombre===svcName;});
+      var esAreaSinCantidad=svcKey&&SERVICIOS_SIN_CANTIDAD_REAL.indexOf(svcKey)>-1;
+
+      for(var li=1;li<lines.length;li++){
+        if(!lines[li].trim()) continue;
+        var itemKey=si+'_'+li;
+        var precio=precios[itemKey]!==undefined?parseFloat(precios[itemKey]):0;
+        var tipoDetalle=parseTipoKey(lines[li]);
+        // Quita el "xN" del detalle de tipo para que quede limpio (la cantidad va en su propia columna)
+        tipoDetalle=tipoDetalle.replace(/\s*·\s*x\d+/i,'').replace(/^x\d+\s*·\s*/i,'');
+
+        var cantidad;
+        if(esAreaSinCantidad){
+          cantidad=1; // 1 servicio solicitado (no aplica cantidad real, ej: Hogar, Comercial, Pisos, Pulido, Alfombras)
+        } else {
+          var cantMatch=lines[li].match(/(?:^|\|)\s*x(\d+)\s*(?:\||$)/i);
+          cantidad=cantMatch?parseInt(cantMatch[1]):1;
+        }
+
+        filas.push({
+          'No. de Cotización':q.numero_cot||'',
+          'Estatus':ESTADO_EXCEL[q.estado]||q.estado,
+          'Fecha':fechaStr,
+          'Cliente (Contacto)':nombreCliente(q),
+          'Tipo de Cliente':q.cliente_tipo||'',
+          'Lugar':lugar,
+          'Condición del Cliente':tipoClienteEstado,
+          'Servicio Solicitado':svcName,
+          'Tipo de Servicio Solicitado':tipoDetalle,
+          'Cantidad':cantidad,
+          'Monto':precio
+        });
+      }
+    });
+  });
+
+  if(filas.length===0){ toast('⚠️ No hay cotizaciones para exportar'); return; }
+
+  // Orden: por Servicio Solicitado (alfabético), luego por Cliente (alfabético)
+  filas.sort(function(a,b){
+    var s=a['Servicio Solicitado'].localeCompare(b['Servicio Solicitado'],'es');
+    if(s!==0) return s;
+    return a['Cliente (Contacto)'].localeCompare(b['Cliente (Contacto)'],'es');
+  });
+
+  var ws=XLSX.utils.json_to_sheet(filas);
+  ws['!cols']=[
+    {wch:16},{wch:18},{wch:12},{wch:22},{wch:14},{wch:20},{wch:16},{wch:22},{wch:28},{wch:10},{wch:10}
+  ];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Cotizaciones');
+  var fechaArchivo=new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb,'AniCare_Cotizaciones_'+fechaArchivo+'.xlsx');
+  toast('✅ Excel generado: '+filas.length+' fila(s)');
+}
+
+async function cargarCotizaciones(){
+  try{
+    var s=getSupa();
+    var {data,error}=await s.from('cotizaciones').select('*').order('fecha_creacion',{ascending:false});
+    if(error) throw error;
+    todasCotizaciones=data||[];
+    // Cargar precios aprendidos por tipo específico (Twin, King, etc.)
+    var pt=await s.from('precios_tipo').select('*');
+    if(pt.data){ pt.data.forEach(function(p){ preciosTipoCache[p.servicio_key+'||'+p.tipo_key]=p.precio; }); }
+    var pa=await s.from('precios_area').select('*');
+    if(pa.data){ pa.data.forEach(function(p){ preciosAreaCache[p.servicio_key+'||'+p.tipo_key]=p.precio_m2; }); }
+    // Cargar precios por área/m² (Pisos, Alfombras, Comercial, Hogar, Persianas)
+    // precios cargados en cargarTodosPrecios() cuando se abre la pestaña
+    renderCotizaciones();
+    revisarPendientesVencidos();
+  } catch(e){
+    document.getElementById('cotList').innerHTML='<div class="empty-state"><div class="ico">⚠️</div>Error al cargar: '+e.message+'</div>';
+  }
+}
+
+// ===================== ALERTA: PENDIENTES +12 HORAS =====================
+function revisarPendientesVencidos(){
+  var ahora=new Date();
+  var pendientesViejos=todasCotizaciones.filter(function(q){
+    if(q.estado!=='pendiente') return false;
+    var horas=(ahora-new Date(q.fecha_creacion))/(1000*60*60);
+    return horas>=12;
+  });
+  var banner=document.getElementById('alertaPendientes');
+  if(pendientesViejos.length===0){
+    if(banner) banner.remove();
+    return;
+  }
+  var msg='🔔 Recordatorio AniCare\n\nTienes '+pendientesViejos.length+' cotización'+(pendientesViejos.length===1?'':'es')+' Pendiente'+(pendientesViejos.length===1?'':'s')+' con más de 12 horas sin precio:\n\n';
+  pendientesViejos.slice(0,10).forEach(function(q){
+    msg+='• '+(q.numero_cot||'')+' — '+nombreCliente(q)+'\n';
+  });
+  if(pendientesViejos.length>10) msg+='...y '+(pendientesViejos.length-10)+' más.';
+  var waLink='https://wa.me/50763171227?text='+encodeURIComponent(msg);
+
+  var h='<div id="alertaPendientes" style="background:#FFF3CD;border:1.5px solid #F59E0B;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  h+='<span style="font-size:22px">🔔</span>';
+  h+='<div style="flex:1;min-width:200px"><strong style="color:#78350F;font-size:13px">'+pendientesViejos.length+' cotización'+(pendientesViejos.length===1?'':'es')+' Pendiente'+(pendientesViejos.length===1?'':'s')+' hace más de 12 horas</strong><br><span style="font-size:11.5px;color:#92400E">Aún no tienen precio asignado — revísalas pronto.</span></div>';
+  h+='<a href="'+waLink+'" target="_blank" style="background:#25D366;color:white;text-decoration:none;padding:9px 14px;border-radius:9px;font-size:12.5px;font-weight:700;white-space:nowrap">📱 Enviarme Recordatorio</a>';
+  h+='</div>';
+
+  var cont=document.getElementById('viewCotizaciones');
+  var existing=document.getElementById('alertaPendientes');
+  if(existing) existing.outerHTML=h;
+  else cont.insertAdjacentHTML('afterbegin',h);
+}
+
+function filtrarEstado(chip,estado){
+  document.querySelectorAll('.filter-chip').forEach(function(c){c.classList.remove('active');});
+  chip.classList.add('active');
+  filtroActual=estado;
+  renderCotizaciones();
+}
+
+function renderCotizaciones(){
+  var list=todasCotizaciones;
+  if(filtroActual!=='todos') list=list.filter(function(c){return c.estado===filtroActual;});
+  var cont=document.getElementById('cotList');
+  if(list.length===0){
+    cont.innerHTML='<div class="empty-state"><div class="ico">📭</div>No hay cotizaciones'+(filtroActual!=='todos'?' '+filtroActual+'s':'')+'.</div>';
+    return;
+  }
+  var estadoTxt={pendiente:'Pendiente',cotizado:'⏳ En Espera',aprobada:'✅ Orden Confirmada - Pendiente de Pago',pagada:'💰 Orden Finalizada',cancelada:'❌ Orden Eliminada'};
+  var h='';
+  for(var i=0;i<list.length;i++){
+    var q=list[i];
+    var fecha=new Date(q.fecha_creacion).toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
+    var alertaCount=detectarAlertaRecurrente(q);
+
+    // Días transcurridos desde que se cotizó, sin pasar a Aprobada/Pagada/Cancelada
+    var vencido=false;
+    if(q.estado==='cotizado'&&q.fecha_cotizado){
+      var diasTranscurridos=(new Date()-new Date(q.fecha_cotizado))/(1000*60*60*24);
+      vencido=diasTranscurridos>7;
+    }
+
+    h+='<div class="q-card '+(q.estado==='cotizado'?'cotizado':'')+'" id="qcard-'+q.id+'">';
+    h+='<div class="q-head" onclick="toggleQuote('+q.id+')">';
+    h+='<span class="q-num">'+(q.numero_cot||'')+'</span>';
+    h+='<span class="q-name">'+nombreCliente(q)+'</span>';
+    h+='<span class="q-date">'+fecha+'</span>';
+    h+='<span class="q-status status-'+q.estado+(vencido?' vencido':'')+'">'+(estadoTxt[q.estado]||q.estado)+(vencido?' (+7 días)':'')+'</span>';
+    h+='<span class="q-chevron">▾</span></div>';
+    if(alertaCount){
+      h+='<div class="alerta-recurrente" style="margin:0 14px 8px">⚠️ <strong>Cliente Recurrente detectado</strong> — marcó "Nuevo" pero tiene '+alertaCount+' cotización'+(alertaCount===1?'':'es')+' aprobada'+(alertaCount===1?'':'s')+' anteriormente.</div>';
+    }
+    h+='<div class="q-body" id="qbody-'+q.id+'"></div>';
+    h+='</div>';
+  }
+  cont.innerHTML=h;
+}
+
+function toggleQuote(id){
+  var card=document.getElementById('qcard-'+id);
+  var wasOpen=card.classList.contains('open');
+  document.querySelectorAll('.q-card').forEach(function(c){c.classList.remove('open');});
+  if(!wasOpen){
+    card.classList.add('open');
+    renderQuoteDetail(id);
+  }
+}
+
+function renderQuoteDetail(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  var body=document.getElementById('qbody-'+id);
+
+  var historial=buscarHistorialCliente(q).filter(function(o){
+    return o.estado==='aprobada'||o.estado==='pagada'||o.estado==='cancelada';
+  });
+  historial.sort(function(a,b){ return new Date(b.fecha_creacion)-new Date(a.fecha_creacion); });
+  var tieneHistorial=historial.length>0;
+
+  var h=tieneHistorial?'<div class="q-split"><div class="q-main">':'<div class="q-main" style="padding:16px">';
+
+  h+='<div class="client-info">';
+  h+='<div><b>Cliente:</b> '+nombreCliente(q)+' ('+(q.cliente_tipo||'-')+')</div>';
+  if(q.cliente_ruc) h+='<div><b>RUC:</b> '+q.cliente_ruc+'</div>';
+  if(q.cliente_ph) h+='<div><b>PH/Residencial:</b> '+q.cliente_ph+'</div>';
+  if(q.cliente_telefono) h+='<div><b>Teléfono:</b> '+q.cliente_telefono+'</div>';
+  if(q.cliente_email) h+='<div><b>Correo:</b> '+q.cliente_email+'</div>';
+  if(q.cliente_direccion) h+='<div><b>Dirección:</b> '+q.cliente_direccion+'</div>';
+  if(q.cliente_recurrente) h+='<div>⭐ Cliente Recurrente</div>';
+  h+='</div>';
+
+  // Parse servicios (array of strings, each multi-line: "Nombre:\n  1. detalle\n  2. detalle")
+  var servicios=q.servicios||[];
+  var precios=q.precios_detalle||{};
+  h+='<div id="priceRows-'+id+'">';
+  for(var si=0;si<servicios.length;si++){
+    var lines=servicios[si].split('\n');
+    var svcName=lines[0].replace(':','');
+    var svcKey=Object.keys(TIPOS_MAP).find(function(k){return TIPOS_MAP[k].nombre===svcName;});
+    for(var li=1;li<lines.length;li++){
+      if(!lines[li].trim()) continue;
+      var itemKey=si+'_'+li;
+      var tipoKey=parseTipoKey(lines[li]);
+      var tipoCacheKey=svcKey+'||'+tipoKey;
+
+      // Detect if this service uses precio/m²
+      var isArea=svcKey&&SVCS_AREA[svcKey];
+      var precioSugerido=0;
+      var sugerenciaLabel='';
+      var areaM2=0;
+
+      if(isArea){
+        // Extract area from item line (looks for patterns like "50 m²" or "120 x 180 cm")
+        var areaMatch=lines[li].match(/(\d+(?:\.\d+)?)\s*m²/);
+        if(areaMatch){ areaM2=parseFloat(areaMatch[1]); }
+        else {
+          // Persianas: "120 x 180 cm" → convert to m²
+          var medMatch=lines[li].match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*cm/i);
+          if(medMatch){ areaM2=(parseFloat(medMatch[1])/100)*(parseFloat(medMatch[2])/100); }
+        }
+        // Look up precio_m2 by tipo first, then general
+        var preciom2=preciosAreaCache[svcKey+'||'+tipoKey]||
+                     preciosAreaCache[svcKey+'||_general'];
+        if(preciom2!==undefined&&areaM2>0){
+          precioSugerido=Math.round(preciom2*areaM2*100)/100;
+          sugerenciaLabel='🧠 $'+preciom2+'/m² × '+areaM2.toFixed(1)+'m²';
+        } else if(preciom2!==undefined&&areaM2===0){
+          precioSugerido=preciom2;
+          sugerenciaLabel='🧠 $'+preciom2+'/m² (ajusta según área)';
+        }
+      } else {
+        // Precio fijo por tipo (colchones, sofas, electro, etc.)
+        var learnedPrice=preciosTipoCache[tipoCacheKey];
+        if(learnedPrice!==undefined){
+          precioSugerido=learnedPrice;
+          sugerenciaLabel='🧠 precio recordado';
+        }
+      }
+
+      var savedPrice=precios[itemKey]!==undefined?precios[itemKey]:precioSugerido;
+
+      // Extraer cantidad (ej: "x2") para mostrarla SOLO como círculo — sin duplicar en el texto
+      var descTexto=lines[li].replace(/^\s*\d+\.\s*/,'');
+      var cantMatch=descTexto.match(/(?:^|\|)\s*x(\d+)\s*(?:\||$)/i);
+      var cantidad=cantMatch?parseInt(cantMatch[1]):null;
+      // Quita el "xN" del texto (ya se muestra en el círculo, evita duplicar)
+      var descResaltada=descTexto.replace(/\s*\|\s*x\d+\s*(?=\|)/i,'').replace(/^\s*x\d+\s*\|\s*/i,'');
+
+      h+='<div class="price-row">';
+      h+='<div class="price-info"><span class="svc-tag">'+svcName+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px;text-transform:none;letter-spacing:normal"> · '+sugerenciaLabel+'</span>':'')+'<br>'+descResaltada+'</div>';
+      if(cantidad!==null){
+        h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
+        h+='<span style="font-size:8px;font-weight:700;color:#40916C;white-space:nowrap">Cantidad</span>';
+        h+='<div class="badge-cant-circle" style="width:24px;height:24px;border-radius:50%;background:#52B788;color:white;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center">'+cantidad+'</div>';
+        h+='</div>';
+      } else if(isArea&&areaM2>0){
+        h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
+        h+='<span style="font-size:8px;font-weight:700;color:#1E40AF;white-space:nowrap">Área</span>';
+        h+='<div class="badge-area-pill" style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px;white-space:nowrap">'+areaM2.toFixed(1)+' m²</div>';
+        h+='</div>';
+      }
+      h+='<div class="price-input-wrap"><span>$</span><input type="number" class="price-input" id="price-'+id+'-'+itemKey+'" data-svckey="'+(svcKey||'')+'" data-tipokey="'+tipoKey.replace(/"/g,'&quot;')+'" data-isarea="'+(isArea?'1':'0')+'" value="'+savedPrice+'" min="0" step="0.5" onchange="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'></div>';
+      h+='</div>';
+    }
+  }
+  h+='</div>';
+
+  h+='<div class="totals-box">';
+  h+='<div class="total-line"><span>Subtotal</span><span id="subtotal-'+id+'">$0.00</span></div>';
+  h+='<div class="discount-row"><span style="font-size:12px;color:#2D6A4F">Descuento $</span><input type="number" id="descuento-'+id+'" value="'+(q.descuento||0)+'" min="0" step="0.5" onchange="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'></div>';
+  h+='<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#2D6A4F;padding:8px 0;cursor:pointer">';
+  h+='<input type="checkbox" id="aplicaItbms-'+id+'" '+(q.aplica_itbms?'checked':'')+' onchange="recalcularTotal('+id+')" style="width:16px;height:16px;cursor:pointer"'+(q.estado==='cancelada'?' disabled':'')+'>';
+  h+='Aplicar ITBMS (7%) — solo si corresponde para este servicio';
+  h+='</label>';
+  h+='<div class="total-line" id="itbmsRow-'+id+'" style="display:'+(q.aplica_itbms?'flex':'none')+'"><span>ITBMS (7%)</span><span id="itbms-'+id+'">$0.00</span></div>';
+  h+='<div class="total-line final"><span>TOTAL</span><span id="total-'+id+'">$0.00</span></div>';
+  h+='</div>';
+
+  // Botones de cambio de estado según el flujo:
+  // Cotizado → Aprobada | Cancelada
+  // Aprobada → Pagada | Cancelada
+  if(q.estado==='cotizado'){
+    if(q.aprobacion_pendiente){
+      h+='<div style="background:#FFF3CD;border:1.5px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:11.5px;color:#78350F;font-weight:700">⏳ Aprobación registrada — envía la cotización al cliente para confirmarla</div>';
+    }
+    // Fila 1: Aprobar + Enviar al Cliente
+    h+='<div class="estado-btns">';
+    h+='<button class="btn-estado btn-aprobar" onclick="marcarAprobada('+id+')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9.5"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>Aprobar</button>';
+    h+='<button class="btn-estado btn-wa-inline" onclick="enviarLinkAprobacion('+id+')">📤 Enviar al Cliente</button>';
+    h+='</div>';
+    // Fila 2: Cancelar + PDF
+    h+='<div class="estado-btns">';
+    h+='<button class="btn-estado btn-cancelar" onclick="abrirModalCancelar('+id+')">❌ Cancelar</button>';
+    h+='<button class="btn-estado btn-pdf-inline" onclick="generarCotizacionPDF('+id+')">📄 PDF</button>';
+    h+='</div>';
+    h+='<div class="estado-hint">💡 El cliente aprueba o rechaza desde su celular — el estado se actualiza solo. "Aprobar" manual solo se confirma después de enviar la cotización.</div>';
+    h+='<button class="btn-modificar" onclick="modificarCotizacion('+id+')">✏️ Modificar Cotización</button>';
+  } else {
+    if(q.estado==='pendiente'){
+      h+='<div class="btn-row">';
+      h+='<button class="btn-save" onclick="guardarYEnviarCotizacion('+id+')">📤 Guardar y Enviar Cotización</button>';
+      h+='<button class="btn-pdf" onclick="generarCotizacionPDF('+id+')">📄 PDF</button>';
+      h+='</div>';
+      h+='<button class="btn-modificar" onclick="toggleRealizarCambios('+id+')">🔧 Realizar Cambios</button>';
+      h+='<div id="editorCambios-'+id+'" style="display:none"></div>';
+    } else if(q.estado==='aprobada'){
+      h+='<div class="btn-row">';
+      h+='<button class="btn-save" onclick="guardarPrecios('+id+')">💾 Guardar Precios</button>';
+      h+='<button class="btn-pdf" onclick="generarCotizacionPDF('+id+')">📄 PDF</button>';
+      h+='</div>';
+      h+='<div class="estado-wrap">';
+      h+='<div class="estado-btns">';
+      h+='<button class="btn-estado btn-pagar" onclick="marcarPagada('+id+')">💰 Pago Realizado</button>';
+      h+='<button class="btn-estado btn-cancelar" onclick="abrirModalCancelar('+id+')">❌ Cancelar</button>';
+      h+='</div>';
+      h+='</div>';
+    } else if(q.estado==='pagada'){
+      h+='<div class="btn-row">';
+      h+='<button class="btn-pdf" onclick="generarCotizacionPDF('+id+')">📄 PDF Factura</button>';
+      h+='<button class="btn-estado btn-wa-inline" onclick="enviarFactura('+id+')">📤 Enviar Factura</button>';
+      h+='</div>';
+    }
+    // Cancelada: sin botones — pantalla de solo lectura (ver punto 6)
+  }
+
+  h+='</div>'; // /q-main
+
+  if(tieneHistorial){
+    h+='<div class="q-side">';
+    h+='<div class="q-side-title">🗂️ Historial del cliente</div>';
+    for(var hi=0;hi<historial.length;hi++){
+      h+=renderTimelineCardClickable(historial[hi],id+'-'+hi);
+    }
+    h+='<p style="font-size:10px;color:#a0aec0;margin-top:6px">👆 Toca una tarjeta para ver el detalle</p>';
+    h+='</div>'; // /q-side
+    h+='</div>'; // /q-split
+  }
+
+  body.innerHTML=h;
+  recalcularTotal(id);
+}
+
+function recalcularTotal(id){
+  var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
+  var subtotal=0;
+  rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; });
+  var descEl=document.getElementById('descuento-'+id);
+  var desc=descEl?(parseFloat(descEl.value)||0):0;
+  var baseImponible=Math.max(0,subtotal-desc);
+  var aplicaItbmsEl=document.getElementById('aplicaItbms-'+id);
+  var aplicaItbms=aplicaItbmsEl?aplicaItbmsEl.checked:false;
+  var itbms=aplicaItbms?baseImponible*0.07:0;
+  var total=baseImponible+itbms;
+  document.getElementById('subtotal-'+id).textContent='$'+subtotal.toFixed(2);
+  var itbmsRow=document.getElementById('itbmsRow-'+id);
+  if(itbmsRow) itbmsRow.style.display=aplicaItbms?'flex':'none';
+  document.getElementById('itbms-'+id).textContent='$'+itbms.toFixed(2);
+  document.getElementById('total-'+id).textContent='$'+total.toFixed(2);
+}
+
+function enviarFactura(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  var msg = '🌟 *AniCare Cleaning Service*\n\n';
+  msg += 'Hola '+nombreCliente(q)+' 👋\n\n';
+  msg += '¡Gracias por tu pago! Tu factura de la cotización N° *'+q.numero_cot+'* ha sido procesada:\n';
+  msg += '💰 Total pagado: *$'+(q.total||0).toFixed(2)+'*'+(q.aplica_itbms?' (ITBMS incluido)':'')+'\n\n';
+  msg += '📄 Te adjuntamos el PDF de tu factura por este medio.\n\n';
+  msg += 'Ha sido un placer atenderte. ¡Gracias por confiar en AniCare! 🧹✨';
+
+  var tel = (q.cliente_telefono||'').replace(/\D/g,'');
+  if(tel.length===8) tel = '507'+tel;
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank');
+  toast('📤 WhatsApp abierto — recuerda adjuntar el PDF de la factura');
+}
+
+async function enviarLinkAprobacion(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  if(!q.token_aprobacion){
+    toast('⚠️ Esta cotización no tiene token. Vuelve a guardar los precios.');
+    return;
+  }
+  var linkAprobacion = GITHUB_BASE_URL+'AniCare_Aprobar_Cotizacion.html?t='+q.token_aprobacion;
+  var msg = '🌟 *AniCare Cleaning Service*\n\n';
+  msg += 'Hola '+nombreCliente(q)+' 👋\n\n';
+  msg += 'Tu cotización N° *'+q.numero_cot+'* está lista:\n';
+  msg += '💰 Total: *$'+(q.total||0).toFixed(2)+'*'+(q.aplica_itbms?' (ITBMS incluido)':'')+'\n\n';
+  msg += '👉 Revisa el detalle y confirma aquí:\n'+linkAprobacion+'\n\n';
+  msg += 'Cualquier duda, escríbenos. ¡Gracias por confiar en AniCare! 🧹✨';
+
+  var tel = (q.cliente_telefono||'').replace(/\D/g,'');
+  if(tel.length===8) tel = '507'+tel; // agrega código de país si falta
+  window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank');
+
+  try{
+    var s=getSupa();
+    if(q.aprobacion_pendiente){
+      // Ya se había marcado "Aprobar" antes — ahora que se envía, se confirma de una vez
+      var {error}=await s.from('cotizaciones').update({enviado_cliente:true,estado:'aprobada',fecha_aprobada:new Date().toISOString(),aprobacion_pendiente:false}).eq('id',id);
+      if(error) throw error;
+      q.enviado_cliente=true; q.estado='aprobada'; q.fecha_aprobada=new Date().toISOString(); q.aprobacion_pendiente=false;
+      toast('✅ Enviado y Aprobado — movido a Aprobadas');
+      var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
+      if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
+      setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id);} },100);
+    } else {
+      var {error}=await s.from('cotizaciones').update({enviado_cliente:true}).eq('id',id);
+      if(error) throw error;
+      q.enviado_cliente=true;
+      renderQuoteDetail(id);
+    }
+  } catch(e){ toast('❌ Error al registrar envío: '+e.message); }
+}
+
+// Botón único de Pendientes: guarda precios Y envía la cotización
+// por WhatsApp y correo electrónico al cliente, todo en un solo paso.
+async function guardarYEnviarCotizacion(id){
+  await guardarPrecios(id);
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q || q.estado!=='cotizado'){
+    return; // guardarPrecios falló — no continuar con el envío
+  }
+  try{
+    await enviarLinkAprobacion(id); // abre WhatsApp + marca enviado_cliente
+    await enviarCorreoCotizacion(q); // envía también por correo
+    toast('✅ Cotización enviada exitosamente');
+  } catch(e){
+    toast('⚠️ Se guardó, pero hubo un problema al enviar: '+e.message);
+  }
+}
+
+// Envía la cotización por correo usando Formspree (mismo formulario que usa el cliente)
+async function enviarCorreoCotizacion(q){
+  var linkAprobacion = q.token_aprobacion ? (GITHUB_BASE_URL+'AniCare_Aprobar_Cotizacion.html?t='+q.token_aprobacion) : '';
+  try{
+    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        tipo:'cotizacion_al_cliente',
+        numCot:q.numero_cot,
+        cliente:{
+          nombre:nombreCliente(q),
+          telefono:q.cliente_telefono||'',
+          email:q.cliente_email||''
+        },
+        linkAprobacion:linkAprobacion
+      })
+    });
+  } catch(e){ console.warn('No se pudo enviar el correo:',e); }
+}
+
+async function guardarPrecios(id){
+  var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
+  var precios={};
+  var subtotal=0;
+  var aprendizajes=[];
+  rows.forEach(function(r){
+    var key=r.id.replace('price-'+id+'-','');
+    var val=parseFloat(r.value)||0;
+    precios[key]=val;
+    subtotal+=val;
+    var svcKey=r.getAttribute('data-svckey');
+    var tipoKey=r.getAttribute('data-tipokey');
+    var cacheKey=svcKey+'||'+tipoKey;
+    // Solo "aprende" precios NUEVOS — nunca sobrescribe un precio base ya fijado.
+    // Si quieres cambiar un precio fijado, hazlo en la sección "Precios por Tipo".
+    if(svcKey&&tipoKey&&val>0&&preciosTipoCache[cacheKey]===undefined){
+      aprendizajes.push({servicio_key:svcKey,tipo_key:tipoKey,precio:val,actualizado:new Date().toISOString()});
+    }
+  });
+  var desc=parseFloat(document.getElementById('descuento-'+id).value)||0;
+  var baseImponible=Math.max(0,subtotal-desc);
+  var aplicaItbmsEl=document.getElementById('aplicaItbms-'+id);
+  var aplicaItbms=aplicaItbmsEl?aplicaItbmsEl.checked:false;
+  var itbms=aplicaItbms?baseImponible*0.07:0;
+  var total=baseImponible+itbms;
+
+  try{
+    var s=getSupa();
+    var {error}=await s.from('cotizaciones').update({
+      precios_detalle:precios,
+      subtotal:subtotal,
+      descuento:desc,
+      aplica_itbms:aplicaItbms,
+      itbms:itbms,
+      total:total,
+      estado:'cotizado',
+      fecha_cotizado:new Date().toISOString()
+    }).eq('id',id);
+    if(error) throw error;
+
+    // Fijar precio base SOLO para combinaciones nunca vistas antes (no sobrescribe)
+    if(aprendizajes.length>0){
+      var {error:errLearn}=await s.from('precios_tipo').insert(aprendizajes);
+      if(!errLearn){
+        aprendizajes.forEach(function(a){ preciosTipoCache[a.servicio_key+'||'+a.tipo_key]=a.precio; });
+        toast('✅ Guardado · '+aprendizajes.length+' precio(s) nuevo(s) fijado(s) como base');
+      } else {
+        toast('✅ Precios guardados correctamente');
+      }
+    } else {
+      toast('✅ Precios guardados correctamente');
+    }
+    // Update local cache
+    var q=todasCotizaciones.find(function(x){return x.id===id;});
+    if(q){ q.precios_detalle=precios; q.subtotal=subtotal; q.descuento=desc; q.aplica_itbms=aplicaItbms; q.itbms=itbms; q.total=total; q.estado='cotizado'; }
+    revisarPendientesVencidos(); // recalcula la alerta de +12h ya que este quote salió de Pendientes
+
+    // Cambia automáticamente al filtro "Esperando Respuesta" para que la
+    // tarjeta no desaparezca de la vista — así el botón de WhatsApp
+    // queda visible de inmediato, sin tener que navegar manualmente.
+    var chipCotizado=document.querySelector('.filter-chip[data-estado="cotizado"]');
+    if(chipCotizado) filtrarEstado(chipCotizado,'cotizado');
+    else renderCotizaciones();
+
+    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
+}
+
+function generarCotizacionPDF(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
+  var subtotal=0;
+  rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; });
+  var desc=parseFloat(document.getElementById('descuento-'+id).value)||0;
+  var baseImponible=Math.max(0,subtotal-desc);
+  var aplicaItbmsEl=document.getElementById('aplicaItbms-'+id);
+  var aplicaItbms=aplicaItbmsEl?aplicaItbmsEl.checked:false;
+  var itbms=aplicaItbms?baseImponible*0.07:0;
+  var total=baseImponible+itbms;
+  var fecha=new Date().toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
+
+  function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  var ICON_MAIL='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M4 4h16v16H4z"/><path d="M4 6l8 7 8-7"/></svg>';
+  var ICON_PHONE='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>';
+  var ICON_PIN='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+
+  var h='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>';
+  h+='*{box-sizing:border-box;margin:0;padding:0}';
+  h+='body{font-family:Arial,sans-serif;color:#2d3748;background:white;max-width:750px;margin:0 auto}';
+  h+='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}';
+  h+='@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}';
+  h+='.svc-block{break-inside:avoid;page-break-inside:avoid}';
+  h+='.svc-item{break-inside:avoid;page-break-inside:avoid}';
+  h+='.svc-header{break-after:avoid;page-break-after:avoid}';
+  h+='.totals{break-inside:avoid;page-break-inside:avoid}';
+  h+='.garantia{break-inside:avoid;page-break-inside:avoid}';
+  h+='.header{break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid}';
+  h+='.client-grid{break-inside:avoid;page-break-inside:avoid}';
+  h+='.obs-box{break-inside:avoid;page-break-inside:avoid}';
+  h+='.header{background:#4B5563;padding:20px 26px;display:flex;align-items:center}';
+  h+='.header .logo-box{background:white;border-radius:12px;padding:6px;flex-shrink:0;margin-right:16px}';
+  h+='.header .logo-box img{height:44px;width:auto;display:block}';
+  h+='.header .brand{flex:1}';
+  h+='.header .brand h1{color:white;font-size:18px;font-weight:800;margin-bottom:7px}';
+  h+='.header .contact-row{font-size:9.5px;color:rgba(255,255,255,.8)}';
+  h+='.header .contact-item{display:inline-block;margin-right:14px}';
+  h+='.header .qbox{background:white;border-radius:10px;padding:10px 16px;text-align:right;flex-shrink:0}';
+  h+='.header .qbox .lbl{color:#94A3B8;font-size:8px;font-weight:700;letter-spacing:.5px}';
+  h+='.header .qbox .num{color:#16202C;font-size:16px;font-weight:900;margin-top:2px}';
+  h+='.header .qbox .date{color:#94A3B8;font-size:8.5px;margin-top:2px}';
+  h+='.pad{padding:20px 26px}';
+  h+='.sec-title{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
+  h+='.client-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:8px}';
+  h+='.client-item{font-size:11.5px;color:#4a5568}';
+  h+='.client-item b{color:#1B2838;font-weight:700}';
+  h+='.pago-row{font-size:11.5px;color:#4a5568;margin-bottom:16px}';
+  h+='.pago-row b{color:#1B2838}';
+  h+='.obs-box{background:#FEF3E2;border-left:3px solid #D97706;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:20px;font-size:11.5px;color:#78350F;line-height:1.6}';
+  h+='.obs-box .t{font-size:9.5px;font-weight:800;color:#B45309;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}';
+  h+='.svc-title-row{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
+  h+='.svc-title-row .t1{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332}';
+  h+='.svc-title-row .t2{font-size:11px;color:#4a5568}';
+  h+='.svc-title-row .t2 b{color:#1B2838}';
+  h+='.svc-block{margin-bottom:14px}';
+  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:11px;font-weight:800;color:#1B4332}';
+  h+='.svc-items{border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px}';
+  h+='.svc-item{display:flex;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #F1F5F4}';
+  h+='.svc-item:last-child{border-bottom:none}';
+  h+='.badge-num{width:22px;height:22px;border-radius:50%;background:#1B4332;color:white;font-size:11px;font-weight:800;text-align:center;line-height:22px;flex-shrink:0;margin-right:10px}';
+  h+='.badge-m2{background:#DBEAFE;color:#1E40AF;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:12px;flex-shrink:0;height:fit-content;white-space:nowrap;margin-right:10px}';
+  h+='.svc-item .desc{font-size:11.5px;color:#4a5568;line-height:1.5;flex:1}';
+  h+='.svc-item .price{font-size:12.5px;font-weight:800;color:#1B2838;white-space:nowrap;margin-left:10px}';
+  h+='.totals{margin-top:16px}';
+  h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 0}';
+  h+='.t-final-box{background:#FEF3E2;border-radius:10px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}';
+  h+='.t-final-box .lbl{font-size:14px;font-weight:800;color:#1B2838}';
+  h+='.t-final-box .val{font-size:22px;font-weight:900;color:#1B2838}';
+  h+='.garantia{background:#F0FAF4;border:1.5px solid #40916C;border-radius:10px;padding:12px 16px;margin-top:16px;font-size:11px;color:#1B4332;line-height:1.7}';
+  h+='.garantia b{color:#1B4332}';
+  h+='.footer{text-align:center;font-size:10px;color:#718096;margin-top:20px;border-top:1px solid #E2E8F0;padding-top:14px}';
+  h+='.footer-row{margin-bottom:6px}';
+  h+='.footer-item{display:inline-block;margin:0 10px}';
+  h+='</style></head><body>';
+
+  // ── Encabezado oscuro con logo, contactos e info de cotización ──
+  h+='<div class="header">';
+  h+='<div class="logo-box"><img src="'+LOGO_BASE64+'" alt="AniCare"></div>';
+  h+='<div class="brand"><h1>AniCare Cleaning Service</h1>';
+  h+='<div class="contact-row">';
+  h+='<span class="contact-item" style="color:white">'+ICON_MAIL+'cleaningserviceanicare.com</span>';
+  h+='<span class="contact-item" style="color:white">'+ICON_MAIL+'cleaningserviceani@gmail.com</span>';
+  h+='<span class="contact-item" style="color:white">'+ICON_PHONE+'+507 6317-1227</span>';
+  h+='</div></div>';
+  h+='<div class="qbox"><div class="lbl">COTIZACIÓN</div><div class="num">N° '+esc(q.numero_cot)+'</div><div class="date">'+fecha+'</div></div>';
+  h+='</div>';
+
+  h+='<div class="pad">';
+
+  // ── Datos del cliente en 2 columnas ──
+  h+='<div class="sec-title">Datos del Cliente</div>';
+  h+='<div class="client-grid">';
+  h+='<div class="client-item"><b>Nombre:</b> '+esc(nombreCliente(q))+'</div>';
+  if(q.cliente_ph||q.cliente_ruc) h+='<div class="client-item"><b>'+(q.cliente_ruc?'RUC':'PH/Residencial')+':</b> '+esc(q.cliente_ruc||q.cliente_ph)+'</div>';
+  if(q.cliente_telefono) h+='<div class="client-item"><b>Teléfono:</b> '+esc(q.cliente_telefono)+'</div>';
+  if(q.cliente_direccion) h+='<div class="client-item"><b>Dirección:</b> '+esc(q.cliente_direccion)+'</div>';
+  if(q.cliente_email) h+='<div class="client-item"><b>Correo:</b> '+esc(q.cliente_email)+'</div>';
+  if(q.cliente_corregimiento) h+='<div class="client-item"><b>Corregimiento:</b> '+esc(q.cliente_corregimiento)+'</div>';
+  h+='</div>';
+  if(q.metodo_pago) h+='<div class="pago-row"><b>Método de pago:</b> '+esc(q.metodo_pago)+'</div>';
+
+  // ── Observaciones (solo si el cliente escribió algo) ──
+  if(q.observaciones&&q.observaciones.trim()){
+    h+='<div class="obs-box"><div class="t">Observaciones del Cliente</div>'+esc(q.observaciones)+'</div>';
+  }
+
+  // ── Título de servicios + fecha alineada a la derecha ──
+  h+='<div class="svc-title-row"><span class="t1">Servicios Solicitados</span>';
+  if(q.fecha_servicio) h+='<span class="t2"><b>Fecha del servicio:</b> '+esc(q.fecha_servicio)+'</span>';
+  h+='</div>';
+
+  // ── Servicios agrupados con círculo numerado o insignia m² ──
+  var gruposPorServicio={};
+  var ordenServicios=[];
+  rows.forEach(function(r){
+    var rowEl=r.closest('.price-row');
+    if(!rowEl) return;
+    var infoEl=rowEl.querySelector('.price-info');
+    var svcTag=infoEl?infoEl.querySelector('.svc-tag'):null;
+    var svcName=svcTag?svcTag.textContent.split('·')[0].trim():'Servicio';
+    var descHtml=infoEl?infoEl.innerHTML.split('<br>')[1]||'':'';
+    // Quita "Nivel:X" (nivel de suciedad) y "xN" (cantidad, ya va en la insignia) del texto
+    descHtml=descHtml.replace(/\s*\|\s*Nivel:[^|]*/i,'');
+    descHtml=descHtml.replace(/\s*\|\s*x\d+\s*(?=\|)/i,'');
+    descHtml=descHtml.replace(/^\s*x\d+\s*\|\s*/i,'');
+    var cantCircle=rowEl.querySelector('.badge-cant-circle');
+    var areaPill=rowEl.querySelector('.badge-area-pill');
+    var badgeHtml='';
+    if(cantCircle){
+      badgeHtml='<div class="badge-num">'+esc(cantCircle.textContent.trim())+'</div>';
+    } else if(areaPill){
+      badgeHtml='<div class="badge-m2">'+esc(areaPill.textContent.trim())+'</div>';
+    }
+    if(!gruposPorServicio[svcName]){ gruposPorServicio[svcName]=[]; ordenServicios.push(svcName); }
+    gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0});
+  });
+  ordenServicios.forEach(function(svcName){
+    h+='<div class="svc-block"><div class="svc-header">'+esc(svcName)+'</div><div class="svc-items">';
+    gruposPorServicio[svcName].forEach(function(it){
+      h+='<div class="svc-item">'+it.badge+'<div class="desc">'+it.desc+'</div><div class="price">$'+it.precio.toFixed(2)+'</div></div>';
+    });
+    h+='</div></div>';
+  });
+
+  // ── Totales con TOTAL destacado en caja ámbar ──
+  h+='<div class="totals">';
+  h+='<div class="t-row"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
+  if(desc>0) h+='<div class="t-row"><span>Descuento</span><span>-$'+desc.toFixed(2)+'</span></div>';
+  if(aplicaItbms) h+='<div class="t-row"><span>ITBMS (7%)</span><span>$'+itbms.toFixed(2)+'</span></div>';
+  h+='<div class="t-final-box"><span class="lbl">TOTAL</span><span class="val">$'+total.toFixed(2)+'</span></div>';
+  h+='</div>';
+
+  // ── Garantía ──
+  h+='<div class="garantia"><b>✓ Garantía de Servicio</b> — AniCare Cleaning Service se compromete a brindar respaldo total a la calidad de su servicio. En caso de cualquier inconformidad, contamos con una garantía válida por siete (7) días calendario contados a partir de la fecha de entrega del servicio.';
+  if(aplicaItbms) h+='<br><b>✓ ITBMS (7%)</b> aplicado según Art. 1057-V del Código Fiscal de Panamá.';
+  h+='</div>';
+
+  h+='</div>'; // /pad
+
+  // ── Footer con iconos ──
+  h+='<div class="footer"><div class="footer-row">';
+  h+='<span class="footer-item">'+ICON_PIN+'Panamá, República de Panamá</span>';
+  h+='<span class="footer-item">'+ICON_MAIL+'cleaningserviceanicare.com</span>';
+  h+='<span class="footer-item">'+ICON_PHONE+'+507 6317-1227</span>';
+  h+='</div>Gracias por confiar en nosotros.</div>';
+
+  h+='</body></html>';
+
+  var win=window.open('','_blank');
+  if(win){ win.document.write(h); win.document.close(); setTimeout(function(){win.print();},400); }
+}
+
+// ===================== PRECIOS BASE =====================
+// ===================== PRECIOS POR TIPO (ya fijados) =====================
+// ===================== GESTIÓN DE PRECIOS UNIFICADA =====================
+
+// Config completa de todos los servicios con sus tablas
+var PRECIOS_CONFIG = [
+  {key:'alfombras', icon:'🪡', nom:'Alfombras o Moquetas', cols:['Tipo','Medida m²','Precio m²'], unidad:'m²',
+   rows:[
+    {tipo:'Alfombra (General)',med:'60 x 110 cm (2 x 3 pies)'},
+    {tipo:'Alfombra (General)',med:'80 x 150 cm (3 x 5 pies)'},
+    {tipo:'Alfombra (General)',med:'120 x 170 cm'},
+    {tipo:'Alfombra (General)',med:'150 x 200 cm'},
+    {tipo:'Alfombra (General)',med:'160 x 230 cm'},
+    {tipo:'Alfombra (General)',med:'180 x 270 cm (6 x 9 pies)'},
+    {tipo:'Alfombra (General)',med:'200 x 290 cm'},
+    {tipo:'Alfombra (General)',med:'200 x 300 cm'},
+    {tipo:'Alfombra (General)',med:'240 x 305 cm'},
+    {tipo:'Alfombra (General)',med:'240 x 340 cm (8 x 10 pies)'},
+    {tipo:'Alfombra (General)',med:'60 x 190 cm'},
+    {tipo:'Alfombra (General)',med:'80 x 240 cm (2.5 x 8 pies)'},
+    {tipo:'Alfombra (General)',med:'80 x 300 cm (2.5 x 10 pies)'},
+    {tipo:'Alfombra Bucle (Bereber/Boucle)',med:'80 x 150 cm (3 x 5 pies)'},
+    {tipo:'Alfombra Bucle (Bereber/Boucle)',med:'150 x 200 cm'},
+    {tipo:'Alfombra Bucle (Bereber/Boucle)',med:'200 x 300 cm'},
+    {tipo:'Alfombra de Fibra Natural',med:'150 x 200 cm'},
+    {tipo:'Alfombra de Fibra Natural',med:'200 x 300 cm'},
+    {tipo:'Alfombra en Rollo (pared a pared)',med:'Por m²'},
+    {tipo:'Alfombra Pelo Corto (Texturizadas/Frisé)',med:'80 x 150 cm (3 x 5 pies)'},
+    {tipo:'Alfombra Pelo Corto (Texturizadas/Frisé)',med:'150 x 200 cm'},
+    {tipo:'Alfombra Pelo Corto (Texturizadas/Frisé)',med:'200 x 300 cm'},
+    {tipo:'Alfombra Pelo Largo (Shaggy)',med:'80 x 150 cm (3 x 5 pies)'},
+    {tipo:'Alfombra Pelo Largo (Shaggy)',med:'150 x 200 cm'},
+    {tipo:'Alfombra Pelo Largo (Shaggy)',med:'200 x 300 cm'},
+    {tipo:'Alfombras Modulares (Cuadrados precortados)',med:'Por m²'}
+   ]},
+  {key:'colchones', icon:'🛏️', nom:'Colchones', cols:['Tipo','Tamaño / Modelo','Precio'], unidad:'',
+   rows:[
+    {tipo:'Colchón',med:'Twin Individual (90 cm x 190 cm)'},
+    {tipo:'Colchón',med:'Twin XL (99 cm x 203 cm)'},
+    {tipo:'Colchón',med:'Full (135 cm x 190 cm)'},
+    {tipo:'Colchón',med:'Matrimonial (140 cm x 190 cm)'},
+    {tipo:'Colchón',med:'Queen Size (150 cm x 203 cm)'},
+    {tipo:'Colchón',med:'King Size (190 cm x 200 cm)'},
+    {tipo:'Colchón',med:'California King (183 cm x 213 cm)'},
+    {tipo:'Cama',med:'Twin Individual (90 cm x 190 cm)'},
+    {tipo:'Cama',med:'Twin XL (99 cm x 203 cm)'},
+    {tipo:'Cama',med:'Full (135 cm x 190 cm)'},
+    {tipo:'Cama',med:'Matrimonial (140 cm x 190 cm)'},
+    {tipo:'Cama',med:'Queen Size (150 cm x 203 cm)'},
+    {tipo:'Cama',med:'King Size (190 cm x 200 cm)'},
+    {tipo:'Cama',med:'California King (183 cm x 213 cm)'},
+    {tipo:'Box de Cama',med:'Twin Individual (90 cm x 190 cm)'},
+    {tipo:'Box de Cama',med:'Full (135 cm x 190 cm)'},
+    {tipo:'Box de Cama',med:'Queen Size (150 cm x 203 cm)'},
+    {tipo:'Box de Cama',med:'King Size (190 cm x 200 cm)'},
+    {tipo:'Box de Cama',med:'California King (183 cm x 213 cm)'},
+    {tipo:'Respaldar',med:'Twin Individual (90 cm x 190 cm)'},
+    {tipo:'Respaldar',med:'Full (135 cm x 190 cm)'},
+    {tipo:'Respaldar',med:'Queen Size (150 cm x 203 cm)'},
+    {tipo:'Respaldar',med:'King Size (190 cm x 200 cm)'}
+   ]},
+  {key:'comercial', icon:'🏢', nom:'Limpieza Comercial', manual:true},
+  {key:'hogar', icon:'🏠', nom:'Limpieza Hogar', manual:true},
+  {key:'persianas', icon:'🪟', nom:'Persianas y Cortinas', cols:['Tipo','Medida (largo x ancho)','Precio m²'], unidad:'m²',
+   rows:[
+    {tipo:'Cortina de Madera',med:'60 x 120 cm'},{tipo:'Cortina de Madera',med:'90 x 150 cm'},
+    {tipo:'Cortina de Madera',med:'120 x 180 cm'},{tipo:'Cortina de Madera',med:'150 x 200 cm'},
+    {tipo:'Cortina de PVC',med:'60 x 120 cm'},{tipo:'Cortina de PVC',med:'90 x 150 cm'},
+    {tipo:'Cortina de PVC',med:'120 x 180 cm'},{tipo:'Cortina de PVC',med:'150 x 200 cm'},
+    {tipo:'Cortina Double Shade',med:'90 x 150 cm'},{tipo:'Cortina Double Shade',med:'120 x 180 cm'},
+    {tipo:'Cortina Double Shade',med:'150 x 200 cm'},{tipo:'Cortina Double Shade',med:'200 x 250 cm'},
+    {tipo:'Cortina Roller',med:'90 x 150 cm'},{tipo:'Cortina Roller',med:'120 x 180 cm'},
+    {tipo:'Cortina Roller',med:'150 x 200 cm'},{tipo:'Cortina Roller',med:'200 x 250 cm'},
+    {tipo:'Cortina Roller Black-out',med:'90 x 150 cm'},
+    {tipo:'Cortina Roller Black-out',med:'120 x 180 cm'},
+    {tipo:'Cortina Roller Black-out',med:'150 x 200 cm'},
+    {tipo:'Persianas',med:'90 x 150 cm'},{tipo:'Persianas',med:'120 x 180 cm'},
+    {tipo:'Persianas',med:'150 x 200 cm'}
+   ]},
+  {key:'pisos', icon:'🪣', nom:'Pisos y Superficies', cols:['Tipo','Precio m²'], unidad:'m²',
+   rows:[
+    {tipo:'Baldosa'},{tipo:'Cerámica'},{tipo:'Granito'},{tipo:'Mármol'},
+    {tipo:'Porcelanato'},{tipo:'Terrazo'},{tipo:'Vinilo'}
+   ]},
+  {key:'pulido', icon:'✨', nom:'Pulido de Pisos', manual:true},
+  {key:'electro', icon:'🔌', nom:'Servicios Adicionales de Limpieza', cols:['Tipo','Precio'], unidad:'',
+   rows:[
+    {tipo:'Campana'},{tipo:'Freidora de aire'},{tipo:'Horno pequeño'},
+    {tipo:'Limpieza de piso con máquina rotativa'},
+    {tipo:'Microondas'},{tipo:'Refrigeradora'}
+   ]},
+  {key:'sofas', icon:'🛋️', nom:'Sofás y Muebles', cols:['Tipo','N° Puestos','Precio'], unidad:'',
+   rows:[
+    {tipo:'Butaca',med:'1 puesto'},
+    {tipo:'Poltrona',med:'1 puesto'},
+    {tipo:'Puff',med:'—'},
+    {tipo:'Silla de comedor',med:'—'},
+    {tipo:'Sofá o Sillón 1 puesto',med:'1 puesto'},
+    {tipo:'Sofá de 2 puestos',med:'2 puestos'},
+    {tipo:'Sofá de 3 puestos',med:'3 puestos'},
+    {tipo:'Sofá en L (3+2 puestos)',med:'3+2 puestos'},
+    {tipo:'Sofá en L (6 puestos)',med:'6 puestos'},
+    {tipo:'Sofá Cama',med:'—'},
+    {tipo:'Sofá Diván',med:'—'},
+    {tipo:'Sofá Ergonómico (reclinable y asiento extensible)',med:'—'},
+    {tipo:'Sofá Futón',med:'—'},
+    {tipo:'Sofá Modular',med:'Por módulo'},
+    {tipo:'Otros',med:'—'}
+   ]}
+];
+
+// Cache: "svcKey||tipoKey" -> {id, precio}
+var preciosCache = {};
+
+async function cargarTodosPrecios(){
+  try{
+    var s=getSupa();
+    // Load from both tables
+    var pt=await s.from('precios_tipo').select('*');
+    var pa=await s.from('precios_area').select('*');
+    preciosCache={};
+    if(pt.data){ pt.data.forEach(function(r){
+      preciosCache[r.servicio_key+'||'+r.tipo_key]={id:r.id,precio:r.precio,tabla:'tipo'};
+    });}
+    if(pa.data){ pa.data.forEach(function(r){
+      var k=r.servicio_key+'||'+r.tipo_key;
+      if(!preciosCache[k]) preciosCache[k]={id:r.id,precio:r.precio_m2,tabla:'area'};
+    });}
+    renderTodosPrecios();
+  } catch(e){
+    document.getElementById('preciosTablaCompleta').innerHTML='<div class="empty-state">⚠️ Error: '+e.message+'</div>';
+  }
+}
+
+function tipoKey(row){
+  return row.med ? row.tipo+' · '+row.med : row.tipo;
+}
+
+function renderTodosPrecios(){
+  var cont=document.getElementById('preciosTablaCompleta');
+  var h='<div class="precios-grid">';
+  for(var si=0;si<PRECIOS_CONFIG.length;si++){
+    var svc=PRECIOS_CONFIG[si];
+    h+='<div class="precio-svc" id="svc-card-'+svc.key+'">';
+    h+='<div class="precio-svc-head" onclick="toggleServicio(\''+svc.key+'\')">';
+    h+='<span class="ico">'+svc.icon+'</span>';
+    h+='<div class="info"><div class="nom">'+svc.nom+'</div>';
+
+    if(svc.manual){
+      h+='<div class="pend ok">📋 Precio manual (inspección)</div>';
+    } else {
+      var totalRows=svc.rows.length;
+      var pendCount=0;
+      for(var ri=0;ri<svc.rows.length;ri++){
+        var tk=tipoKey(svc.rows[ri]);
+        var cached=preciosCache[svc.key+'||'+tk];
+        if(!cached||cached.precio===undefined||cached.precio===null||cached.precio==='') pendCount++;
+      }
+      if(pendCount===0){
+        h+='<div class="pend ok">✅ Todos los precios fijados</div>';
+      } else {
+        h+='<div class="pend warn">⚠️ '+pendCount+' precio'+(pendCount===1?'':'s')+' pendiente'+(pendCount===1?'':'s')+' de '+totalRows+'</div>';
+      }
+    }
+    h+='</div>';
+    h+='<span class="chev" id="chev-'+svc.key+'">▸</span>';
+    h+='</div>'; // /precio-svc-head
+
+    if(svc.manual){
+      h+='<div class="nota-manual" style="display:none" id="body-'+svc.key+'">📋 <strong>Precio por inspección.</strong> El costo se determina individualmente según trabajo hombre, tiempo, productos y equipo requeridos. El precio se ingresa directamente en cada cotización al recibirla.</div>';
+    } else {
+      h+='<div class="precio-table-wrap" id="body-'+svc.key+'">';
+      h+='<table class="precio-table"><thead><tr>';
+      for(var ci=0;ci<svc.cols.length;ci++){
+        h+='<th>'+svc.cols[ci]+'</th>';
+      }
+      h+='</tr></thead><tbody>';
+      for(var ri=0;ri<svc.rows.length;ri++){
+        var row=svc.rows[ri];
+        var tk=tipoKey(row);
+        var cached=preciosCache[svc.key+'||'+tk];
+        var val=cached?cached.precio:'';
+        var hasVal=val!=='';
+        h+='<tr>';
+        h+='<td>'+row.tipo+'</td>';
+        if(row.med!==undefined) h+='<td style="color:#718096;font-size:11px">'+row.med+'</td>';
+        h+='<td><div class="pcell"><span>$</span>';
+        h+='<input type="number" class="precio-inp'+(hasVal?' has-val':'')+'" ';
+        h+='data-svc="'+svc.key+'" data-tk="'+tk.replace(/"/g,'&quot;')+'" data-unidad="'+svc.unidad+'" ';
+        h+='value="'+(hasVal?val:'')+'" min="0" step="0.50" placeholder="0.00" ';
+        h+='oninput="toggleHasVal(this)">';
+        h+='</div></td>';
+        h+='</tr>';
+      }
+      h+='</tbody></table>';
+      h+='</div>'; // /precio-table-wrap
+    }
+    h+='</div>'; // /precio-svc
+  }
+  h+='</div>'; // /precios-grid
+  cont.innerHTML=h;
+}
+
+// Estado de expansión (colapsados por defecto)
+var serviciosExpandidos={};
+
+function toggleServicio(key){
+  var card=document.getElementById('svc-card-'+key);
+  var chev=document.getElementById('chev-'+key);
+  var expanded=card.classList.toggle('expanded');
+  chev.textContent=expanded?'▾':'▸';
+  serviciosExpandidos[key]=expanded;
+}
+
+function toggleTodosServicios(){
+  var btn=document.getElementById('btnToggleAll');
+  var algunoColapsado=PRECIOS_CONFIG.some(function(svc){
+    var card=document.getElementById('svc-card-'+svc.key);
+    return card && !card.classList.contains('expanded');
+  });
+  PRECIOS_CONFIG.forEach(function(svc){
+    var card=document.getElementById('svc-card-'+svc.key);
+    var chev=document.getElementById('chev-'+svc.key);
+    if(!card) return;
+    if(algunoColapsado){
+      card.classList.add('expanded');
+      if(chev) chev.textContent='▾';
+      serviciosExpandidos[svc.key]=true;
+    } else {
+      card.classList.remove('expanded');
+      if(chev) chev.textContent='▸';
+      serviciosExpandidos[svc.key]=false;
+    }
+  });
+  btn.textContent=algunoColapsado?'▴ Colapsar todos':'▾ Expandir todos';
+}
+
+function toggleHasVal(inp){
+  inp.classList.toggle('has-val', inp.value!=='' && parseFloat(inp.value)>0);
+}
+
+async function guardarTodosPrecios(){
+  var inputs=document.querySelectorAll('.precio-inp');
+  var byTabla={tipo:[],area:[]};
+  var count=0;
+  inputs.forEach(function(inp){
+    var val=parseFloat(inp.value);
+    if(!inp.value||isNaN(val)||val<0) return;
+    var sk=inp.getAttribute('data-svc');
+    var tk=inp.getAttribute('data-tk');
+    var unidad=inp.getAttribute('data-unidad');
+    var tabla=unidad==='m²'?'area':'tipo';
+    byTabla[tabla].push({svc:sk,tk:tk,val:val});
+    count++;
+  });
+  if(count===0){ toast('⚠️ No hay precios para guardar'); return; }
+  try{
+    var s=getSupa();
+    // Save fixed prices → precios_tipo
+    if(byTabla.tipo.length>0){
+      var rows=byTabla.tipo.map(function(r){
+        return {servicio_key:r.svc,tipo_key:r.tk,precio:r.val,actualizado:new Date().toISOString()};
+      });
+      var {error:e1}=await s.from('precios_tipo').upsert(rows,{onConflict:'servicio_key,tipo_key'});
+      if(e1) throw e1;
+    }
+    // Save m² prices → precios_area
+    if(byTabla.area.length>0){
+      var rowsA=byTabla.area.map(function(r){
+        return {servicio_key:r.svc,tipo_key:r.tk,precio_m2:r.val,actualizado:new Date().toISOString()};
+      });
+      var {error:e2}=await s.from('precios_area').upsert(rowsA,{onConflict:'servicio_key,tipo_key'});
+      if(e2) throw e2;
+    }
+    toast('✅ '+count+' precio(s) guardado(s) correctamente');
+    await cargarTodosPrecios();
+  } catch(e){
+    toast('❌ Error: '+e.message);
+  }
+}
+
+// Keep save-settings-btn alias
+function guardarPreciosArea(){ guardarTodosPrecios(); }
+
+</script>
+</body>
+</html>
