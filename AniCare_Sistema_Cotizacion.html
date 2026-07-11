@@ -2545,7 +2545,18 @@ function confirmarEnvio(){
   var numCot=_numCotParaEnvio;
   var fecha=new Date().toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
 
-  // Abrir PDF usando Blob URL — no bloqueado por navegadores
+  if(porEmail){
+    // Enviar email PRIMERO antes de abrir PDF
+    enviarEmail(numCot,d).catch(function(e){ console.warn('Email a Ani no enviado:',e); });
+    if(d&&d.email&&d.email.trim()){
+      enviarEmailCliente(numCot,d).catch(function(e){ console.warn('Email al cliente no enviado:',e); });
+    }
+  }
+  if(porWA){
+    setTimeout(function(){ abrirWA(d,numCot); },600);
+  }
+
+  // Abrir PDF DESPUÉS de iniciar los envíos
   var h=construirHTMLPDF(d,numCot,fecha);
   var blob=new Blob([h],{type:'text/html'});
   var url=URL.createObjectURL(blob);
@@ -2554,18 +2565,6 @@ function confirmarEnvio(){
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   setTimeout(function(){ URL.revokeObjectURL(url); },5000);
-
-  if(porEmail){
-    // Notificación a Ani SIEMPRE (no depende del email del cliente)
-    enviarEmail(numCot,d).catch(function(e){ console.warn('Email a Ani no enviado:',e); });
-    // Email al cliente solo si tiene correo
-    if(d&&d.email&&d.email.trim()){
-      enviarEmailCliente(numCot,d).catch(function(e){ console.warn('Email al cliente no enviado:',e); });
-    }
-  }
-  if(porWA){
-    setTimeout(function(){ abrirWA(d,numCot); },600);
-  }
 
   mostrarExito(numCot,'email');
 }
