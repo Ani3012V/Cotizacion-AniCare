@@ -2556,10 +2556,11 @@ function confirmarEnvio(){
   setTimeout(function(){ URL.revokeObjectURL(url); },5000);
 
   if(porEmail){
-    if(!d||!d.email||!d.email.trim()){
-      aniModal({tipo:'warn',titulo:'Correo requerido',msg:'No tienes correo registrado. Completa el campo de correo electrónico.',btnTxt:'✓ Entendido'});
-    } else {
-      enviarEmail(numCot,d).catch(function(e){ console.warn('Email no enviado:',e); });
+    // Notificación a Ani SIEMPRE (no depende del email del cliente)
+    enviarEmail(numCot,d).catch(function(e){ console.warn('Email a Ani no enviado:',e); });
+    // Email al cliente solo si tiene correo
+    if(d&&d.email&&d.email.trim()){
+      enviarEmailCliente(numCot,d).catch(function(e){ console.warn('Email al cliente no enviado:',e); });
     }
   }
   if(porWA){
@@ -2616,6 +2617,7 @@ async function btnWhatsApp(){
 
 // ===================== EMAIL (Formspree) =====================
 async function enviarEmail(numCot,d){
+  // Email de notificación a Ani
   try{
     await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
       method:'POST',
@@ -2633,7 +2635,27 @@ async function enviarEmail(numCot,d){
         fecha:d.fecha||''
       })
     });
-  } catch(e){ console.warn('Email no enviado:',e); }
+  } catch(e){ console.warn('Email a Ani no enviado:',e); }
+}
+
+async function enviarEmailCliente(numCot,d){
+  // Email de confirmación al cliente
+  try{
+    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        tipo:'cotizacion_recibida_cliente',
+        numCot:numCot,
+        cliente:{
+          nombre:d.nombre,
+          telefono:d.tel,
+          email:d.email||'',
+        },
+        fecha:d.fecha||''
+      })
+    });
+  } catch(e){ console.warn('Email al cliente no enviado:',e); }
 }
 
 // ===================== WHATSAPP =====================
