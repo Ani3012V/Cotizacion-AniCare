@@ -654,19 +654,9 @@ async function getNumCot(){
 // Preview del próximo número (sin incrementar)
 async function getNumCotPreview(){
   var año = new Date().getFullYear();
-  try{
-    var sb = getSupa();
-    var {data,error} = await sb
-      .from('consecutivo_anual')
-      .select('ultimo_numero')
-      .eq('año', año)
-      .maybeSingle();
-    if(error) throw error;
-    var next = data ? data.ultimo_numero + 1 : 1;
-    return 'AC-'+año+'-'+String(next).padStart(4,'0');
-  } catch(e){
-    return 'AC-'+año+'-####';
-  }
+  // La tabla consecutivo_anual está protegida por RLS (solo la función RPC accede).
+  // El número real se asigna al crear la cotización — aquí solo placeholder.
+  return 'AC-'+año+'-####';
 }
 
 // Guarda la cotización completa en Supabase
