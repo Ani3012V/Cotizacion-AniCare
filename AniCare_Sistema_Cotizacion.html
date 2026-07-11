@@ -2621,7 +2621,7 @@ async function enviarEmail(numCot,d){
   try{
     await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M'},
       body:JSON.stringify({
         tipo:'nueva_cotizacion',
         numCot:numCot,
@@ -2643,7 +2643,7 @@ async function enviarEmailCliente(numCot,d){
   try{
     await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M'},
       body:JSON.stringify({
         tipo:'cotizacion_recibida_cliente',
         numCot:numCot,
