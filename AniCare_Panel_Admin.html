@@ -1529,7 +1529,7 @@ function renderQuoteDetail(id){
         }
         h+='<div class="price-input-wrap">';
         h+='<span class="currency">$</span>';
-        h+='<input type="number" class="price-input" data-key="'+itemKey+'" data-svc="'+svcKey+'" data-id="'+id+'" value="'+(precioActual||'')+'" placeholder="0.00" min="0" step="0.01" oninput="actualizarPrecio(this)">';
+        h+='<input type="number" class="price-input" id="price-'+id+'-'+itemKey+'" data-key="'+itemKey+'" data-svc="'+svcKey+'" data-id="'+id+'" value="'+(precioActual||'')+'" placeholder="0.00" min="0" step="0.01" oninput="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'>';
         h+='</div>';
         h+='</div>';
       });
@@ -1795,20 +1795,11 @@ async function guardarPrecios(id){
   var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
   var precios={};
   var subtotal=0;
-  var aprendizajes=[];
   rows.forEach(function(r){
     var key=r.id.replace('price-'+id+'-','');
     var val=parseFloat(r.value)||0;
     precios[key]=val;
     subtotal+=val;
-    var svcKey=r.getAttribute('data-svckey');
-    var tipoKey=r.getAttribute('data-tipokey');
-    var cacheKey=svcKey+'||'+tipoKey;
-    // Solo "aprende" precios NUEVOS — nunca sobrescribe un precio base ya fijado.
-    // Si quieres cambiar un precio fijado, hazlo en la sección "Precios por Tipo".
-    if(svcKey&&tipoKey&&val>0&&preciosTipoCache[cacheKey]===undefined){
-      aprendizajes.push({servicio_key:svcKey,tipo_key:tipoKey,precio:val,actualizado:new Date().toISOString()});
-    }
   });
   var desc=parseFloat(document.getElementById('descuento-'+id).value)||0;
   var baseImponible=Math.max(0,subtotal-desc);
@@ -1831,18 +1822,12 @@ async function guardarPrecios(id){
     }).eq('id',id);
     if(error) throw error;
 
-    // Fijar precio base SOLO para combinaciones nunca vistas antes (no sobrescribe)
-    if(aprendizajes.length>0){
-      var {error:errLearn}=await s.from('precios_tipo').insert(aprendizajes);
-      if(!errLearn){
-        aprendizajes.forEach(function(a){ preciosTipoCache[a.servicio_key+'||'+a.tipo_key]=a.precio; });
-        toast('✅ Guardado · '+aprendizajes.length+' precio(s) nuevo(s) fijado(s) como base');
-      } else {
-        toast('✅ Precios guardados correctamente');
-      }
-    } else {
-      toast('✅ Precios guardados correctamente');
-    }
+    // IMPORTANTE: los precios de aquí NUNCA se graban como precio base del catálogo,
+    // sin importar si es la primera vez que se ve esa combinación o no. Esto es
+    // intencional (Opción B) — un ajuste dentro de una cotización es solo de ESA
+    // cotización. Si quieres que un precio se vuelva tu tarifa estándar para futuras
+    // cotizaciones automáticas, agrégalo/edítalo en "Gestionar Precios".
+    toast('✅ Precios guardados correctamente (solo en esta cotización)');
     // Update local cache
     var q=todasCotizaciones.find(function(x){return x.id===id;});
     if(q){ q.precios_detalle=precios; q.subtotal=subtotal; q.descuento=desc; q.aplica_itbms=aplicaItbms; q.itbms=itbms; q.total=total; q.estado='cotizado'; }
