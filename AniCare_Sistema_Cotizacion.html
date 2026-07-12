@@ -669,33 +669,35 @@ async function guardarEnSupabase(numCot, d){
     // Convertir svcs (array de strings) a array de objetos con svc key
     var serviciosObj = construirServiciosObj(d);
 
-    var {data, error} = await sb.from('cotizaciones').insert({
-      numero_cot: numCot,
-      año: año,
-      consecutivo: consec,
-      cliente_nombre: d.nombre,
-      cliente_tipo: d.tipo,
-      cliente_telefono: d.tel,
-      cliente_email: d.email,
-      cliente_direccion: d.dir,
-      cliente_corregimiento: d.correg,
-      cliente_recurrente: d.rec,
-      cliente_nuevo: d.nuevo,
-      cliente_empresa: d.empresa,
-      cliente_ruc: d.ruc,
-      cliente_ph: d.ph,
-      fecha_servicio: d.fecha || null,
-      servicios: serviciosObj,
-      metodo_pago: d.pagos.join(', '),
-      observaciones: d.obs,
-      estado: 'pendiente'
-    }).select('id').single();
+    // Se usa una función SECURITY DEFINER (no insert directo a la tabla) porque el
+    // formulario público (rol anon) ya no tiene permiso de LEER cotizaciones —
+    // solo de crearlas a través de esta función controlada.
+    var {data, error} = await sb.rpc('crear_cotizacion_publica', {
+      p_numero_cot: numCot,
+      p_año: año,
+      p_consecutivo: consec,
+      p_cliente_nombre: d.nombre,
+      p_cliente_tipo: d.tipo,
+      p_cliente_telefono: d.tel,
+      p_cliente_email: d.email,
+      p_cliente_direccion: d.dir,
+      p_cliente_corregimiento: d.correg,
+      p_cliente_recurrente: d.rec,
+      p_cliente_nuevo: d.nuevo,
+      p_cliente_empresa: d.empresa,
+      p_cliente_ruc: d.ruc,
+      p_cliente_ph: d.ph,
+      p_fecha_servicio: d.fecha || null,
+      p_servicios: serviciosObj,
+      p_metodo_pago: d.pagos.join(', '),
+      p_observaciones: d.obs
+    });
     if(error) throw error;
     console.log('✅ Cotización guardada en Supabase:', numCot);
 
-    // Llamar automáticamente a calcular-precios
-    if(data && data.id){
-      calcularPreciosAuto(data.id).catch(function(e){
+    // Llamar automáticamente a calcular-precios (data = id devuelto por la función)
+    if(data){
+      calcularPreciosAuto(data).catch(function(e){
         console.warn('calcular-precios no completado:', e);
       });
     }
