@@ -558,14 +558,29 @@ function extraerItemsCotizacion(q){
   var items=[];
   var servicios=q.servicios||[];
   var precios=q.precios_detalle||{};
-  for(var si=0;si<servicios.length;si++){
-    var lines=servicios[si].split('\n');
-    var svcName=lines[0].replace(':','');
-    for(var li=1;li<lines.length;li++){
-      if(!lines[li].trim()) continue;
-      var itemKey=si+'_'+li;
-      var precio=precios[itemKey]!==undefined?precios[itemKey]:0;
-      items.push({svc:svcName,desc:lines[li].replace(/^\s*\d+\.\s*/,''),precio:precio});
+  // Detectar formato
+  if(servicios.length>0 && typeof servicios[0]==='object'){
+    // Nuevo formato: array de objetos
+    servicios.forEach(function(item,idx){
+      var svcKey=item.svc||'';
+      var svcName=(TIPOS_MAP[svcKey]&&TIPOS_MAP[svcKey].nombre)||svcKey;
+      var desc=item.tipo||'';
+      if(item.medidas) desc+=' | '+item.medidas;
+      if(item.area) desc+=' | '+item.area+' m²';
+      var precio=item.precio||0;
+      items.push({svc:svcName,desc:desc,precio:precio});
+    });
+  } else {
+    // Formato antiguo: array de strings
+    for(var si=0;si<servicios.length;si++){
+      var lines=servicios[si].split('\n');
+      var svcName=lines[0].replace(':','');
+      for(var li=1;li<lines.length;li++){
+        if(!lines[li].trim()) continue;
+        var itemKey=si+'_'+li;
+        var precio=precios[itemKey]!==undefined?precios[itemKey]:0;
+        items.push({svc:svcName,desc:lines[li].replace(/^\s*\d+\.\s*/,''),precio:precio});
+      }
     }
   }
   return items;
@@ -1450,14 +1465,78 @@ function renderQuoteDetail(id){
   if(q.cliente_recurrente) h+='<div>⭐ Cliente Recurrente</div>';
   h+='</div>';
 
-  // Parse servicios (array of strings, each multi-line: "Nombre:\n  1. detalle\n  2. detalle")
-  var servicios=q.servicios||[];
+  // Parse servicios — compatible con formato antiguo (strings) y nuevo (objetos)
+  var serviciosRaw=q.servicios||[];
   var precios=q.precios_detalle||{};
   h+='<div id="priceRows-'+id+'">';
-  for(var si=0;si<servicios.length;si++){
-    var lines=servicios[si].split('\n');
-    var svcName=lines[0].replace(':','');
-    var svcKey=Object.keys(TIPOS_MAP).find(function(k){return TIPOS_MAP[k].nombre===svcName;});
+
+  // Detectar formato: si es array de objetos (nuevo formato de calcular-precios)
+  var esFormatoObjeto = serviciosRaw.length > 0 && typeof serviciosRaw[0] === 'object';
+
+  if(esFormatoObjeto){
+    // NUEVO FORMATO: array de objetos con svc, tipo, cant, area, precio...
+    var svcsAgrupados = {};
+    serviciosRaw.forEach(function(item){
+      var svcKey = item.svc || 'otros';
+      if(!svcsAgrupados[svcKey]) svcsAgrupados[svcKey] = [];
+      svcsAgrupados[svcKey].push(item);
+    });
+
+    Object.keys(svcsAgrupados).forEach(function(svcKey){
+      var items = svcsAgrupados[svcKey];
+      var svcName = (TIPOS_MAP[svcKey] && TIPOS_MAP[svcKey].nombre) || svcKey;
+      items.forEach(function(item, idx){
+        var itemKey = svcKey+'_'+idx;
+        var desc = item.tipo || '';
+        if(item.medidas) desc += ' | '+item.medidas;
+        if(item.sup) desc += ' | '+item.sup;
+        if(item.area) desc += ' | '+item.area+' m²';
+        if(item.cant && item.cant > 1) desc += ' | x'+item.cant;
+        if(item.nivTxt) desc += ' | Nivel:'+item.nivTxt;
+        if(item.motivos && item.motivos.length) desc += ' | '+item.motivos.join(', ');
+
+        var precioActual = q.precios_detalle && q.precios_detalle[itemKey] !== undefined
+          ? q.precios_detalle[itemKey]
+          : (item.precio !== undefined ? item.precio : 0);
+
+        var isArea = svcKey && SVCS_AREA[svcKey];
+        var areaM2 = parseFloat(item.area || '0');
+        if(!areaM2 && item.medidas){
+          var mMatch = item.medidas.match(/(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*cm/i);
+          if(mMatch) areaM2 = (parseFloat(mMatch[1])/100)*(parseFloat(mMatch[2])/100);
+        }
+
+        var sugerenciaLabel = '';
+        var precioSugerido = precioActual;
+        if(precioActual > 0 && item.manual !== true){
+          sugerenciaLabel = '🧠 calculado automáticamente';
+        }
+
+        var cant = item.cant || 1;
+
+        h+='<div class="price-row">';
+        h+='<div class="price-info"><span class="svc-tag">'+svcName+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px"> · '+sugerenciaLabel+'</span>':'')+'<br>'+desc+'</div>';
+        if(cant > 1){
+          h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
+          h+='<span style="font-size:8px;font-weight:700;color:#40916C">Cantidad</span>';
+          h+='<div style="width:24px;height:24px;border-radius:50%;background:#52B788;color:white;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center">'+cant+'</div>';
+          h+='</div>';
+        } else if(isArea && areaM2 > 0){
+          h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
+          h+='<span style="font-size:8px;font-weight:700;color:#1E40AF">Área</span>';
+          h+='<div style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px">'+areaM2.toFixed(1)+' m²</div>';
+          h+='</div>';
+        }
+        h+='<div class="price-input-wrap">';
+        h+='<span class="currency">$</span>';
+        h+='<input type="number" class="price-input" data-key="'+itemKey+'" data-svc="'+svcKey+'" data-id="'+id+'" value="'+(precioActual||'')+'" placeholder="0.00" min="0" step="0.01" oninput="actualizarPrecio(this)">';
+        h+='</div>';
+        h+='</div>';
+      });
+    });
+  } else {
+    // FORMATO ANTIGUO: array de strings
+    var servicios = serviciosRaw;
     for(var li=1;li<lines.length;li++){
       if(!lines[li].trim()) continue;
       var itemKey=si+'_'+li;
@@ -1524,7 +1603,7 @@ function renderQuoteDetail(id){
       h+='</div>';
     }
   }
-  h+='</div>';
+  h+='</div>';  // fin bloque else formato antiguo
 
   h+='<div class="totals-box">';
   h+='<div class="total-line"><span>Subtotal</span><span id="subtotal-'+id+'">$0.00</span></div>';
