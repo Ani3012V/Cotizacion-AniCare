@@ -3178,6 +3178,11 @@ function nuevaSolicitud(){
   vistaCarritoAbierta=false;
   var czR=document.getElementById('checkoutZone');
   if(czR) czR.style.display='none';
+  // Restaurar la columna derecha — irACheckout() la oculta y nadie la volvía a mostrar
+  var colDerR=document.getElementById('colDer');
+  if(colDerR) colDerR.style.display='';
+  var colsR=document.querySelector('.cols');
+  if(colsR) colsR.style.gridTemplateColumns='';
   var phR=document.getElementById('placeholderDer');
   if(phR) phR.style.display='block';
   renderCart();
