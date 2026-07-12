@@ -665,7 +665,11 @@ async function guardarEnSupabase(numCot, d){
     var sb = getSupa();
     var año = new Date().getFullYear();
     var consec = parseInt(numCot.replace('*','').split('-')[2]) || 0;
-    var {error} = await sb.from('cotizaciones').insert({
+
+    // Convertir svcs (array de strings) a array de objetos con svc key
+    var serviciosObj = construirServiciosObj(d);
+
+    var {data, error} = await sb.from('cotizaciones').insert({
       numero_cot: numCot,
       año: año,
       consecutivo: consec,
@@ -681,18 +685,55 @@ async function guardarEnSupabase(numCot, d){
       cliente_ruc: d.ruc,
       cliente_ph: d.ph,
       fecha_servicio: d.fecha || null,
-      servicios: d.svcs,
+      servicios: serviciosObj,
       metodo_pago: d.pagos.join(', '),
       observaciones: d.obs,
       estado: 'pendiente'
-    });
+    }).select('id').single();
     if(error) throw error;
     console.log('✅ Cotización guardada en Supabase:', numCot);
+
+    // Llamar automáticamente a calcular-precios
+    if(data && data.id){
+      calcularPreciosAuto(data.id).catch(function(e){
+        console.warn('calcular-precios no completado:', e);
+      });
+    }
     return true;
   } catch(e){
     console.error('❌ Error guardando en Supabase:', e);
     return false;
   }
+}
+
+function construirServiciosObj(d){
+  // Convierte svcItems en array de objetos para Supabase
+  var resultado = [];
+  var keys = Object.keys(svcItems);
+  for(var i=0; i<keys.length; i++){
+    var svc = keys[i];
+    var items = svcItems[svc] || [];
+    for(var j=0; j<items.length; j++){
+      resultado.push(Object.assign({}, items[j], { svc: svc }));
+    }
+  }
+  return resultado;
+}
+
+async function calcularPreciosAuto(cotizacionId){
+  var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M';
+  var res = await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/rapid-api',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'apikey': ANON_KEY,
+      'Authorization': 'Bearer ' + ANON_KEY
+    },
+    body: JSON.stringify({ cotizacion_id: cotizacionId })
+  });
+  var data = await res.json();
+  console.log('💰 Precios calculados:', data);
+  return data;
 }
 
 // ===================== TRANSLATIONS =====================
