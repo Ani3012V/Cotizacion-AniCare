@@ -2480,10 +2480,16 @@ function validarFormulario(){
 }
 
 async function obtenerNumSesion(d){
-  // Si ya se generó un número en esta sesión, reutilizarlo (sin duplicar)
+  // Si ya se guardó exitosamente en esta sesión, reutilizar el mismo número (sin duplicar)
   if(_numCotSesion) return _numCotSesion;
-  _numCotSesion = await getNumCot();
-  await guardarEnSupabase(_numCotSesion, d);
+  var numTmp = await getNumCot();
+  var ok = await guardarEnSupabase(numTmp, d);
+  if(!ok){
+    // No dejar avanzar el flujo (email/WhatsApp) si el guardado en Supabase falló.
+    // Tampoco se fija _numCotSesion, así un reintento vuelve a intentar guardar de cero.
+    throw new Error('No se pudo registrar la cotización en el sistema. Por favor intenta de nuevo.');
+  }
+  _numCotSesion = numTmp;
   return _numCotSesion;
 }
 
