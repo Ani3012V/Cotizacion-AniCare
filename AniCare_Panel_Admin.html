@@ -1985,8 +1985,10 @@ function generarCotizacionPDF(id){
   h+='.svc-items{border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px}';
   h+='.svc-item{display:flex;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #F1F5F4}';
   h+='.svc-item:last-child{border-bottom:none}';
-  h+='.badge-num{width:22px;height:22px;border-radius:50%;background:#1B4332;color:white;font-size:11px;font-weight:800;text-align:center;line-height:22px;flex-shrink:0;margin-right:10px}';
-  h+='.badge-m2{background:#DBEAFE;color:#1E40AF;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:12px;flex-shrink:0;height:fit-content;white-space:nowrap;margin-right:10px}';
+  h+='.badge-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;margin-right:10px}';
+  h+='.badge-wrap .lbl{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}';
+  h+='.badge-num{width:22px;height:22px;border-radius:50%;background:#1B4332;color:white;font-size:11px;font-weight:800;text-align:center;line-height:22px;flex-shrink:0}';
+  h+='.badge-m2{background:#DBEAFE;color:#1E40AF;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:12px;flex-shrink:0;height:fit-content;white-space:nowrap}';
   h+='.svc-item .desc{font-size:11.5px;color:#4a5568;line-height:1.5;flex:1}';
   h+='.svc-item .price{font-size:12.5px;font-weight:800;color:#1B2838;white-space:nowrap;margin-left:10px}';
   h+='.totals{margin-top:16px}';
@@ -2055,9 +2057,9 @@ function generarCotizacionPDF(id){
     var areaPill=rowEl.querySelector('.badge-area-pill');
     var badgeHtml='';
     if(cantCircle){
-      badgeHtml='<div class="badge-num">'+esc(cantCircle.textContent.trim())+'</div>';
+      badgeHtml='<div class="badge-wrap"><span class="lbl" style="color:#1B4332">Cantidad</span><div class="badge-num">'+esc(cantCircle.textContent.trim())+'</div></div>';
     } else if(areaPill){
-      badgeHtml='<div class="badge-m2">'+esc(areaPill.textContent.trim())+'</div>';
+      badgeHtml='<div class="badge-wrap"><span class="lbl" style="color:#1E40AF">Área</span><div class="badge-m2">'+esc(areaPill.textContent.trim())+'</div></div>';
     }
     if(!gruposPorServicio[svcName]){ gruposPorServicio[svcName]=[]; ordenServicios.push(svcName); }
     gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0});
