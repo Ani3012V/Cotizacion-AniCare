@@ -27,6 +27,12 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 .topbar h1{color:white;font-size:15px;font-weight:800;flex:1}
 .topbar button{background:rgba(255,255,255,.15);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer}
 
+.modo-tabs{display:flex;gap:2px;background:rgba(0,0,0,.18);border-radius:10px;padding:3px;flex-shrink:0}
+.modo-tab{border:none;background:transparent;color:rgba(255,255,255,.65);font-size:11.5px;font-weight:800;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.modo-tab.active{background:white;color:#1B4332}
+.modo-tab.active.automatico{color:#2D6A4F}
+@media(max-width:640px){.modo-tab span.txt{display:none}}
+
 .tabs{display:flex;gap:0;background:white;border-bottom:2px solid #e2e8f0;padding:0 16px}
 .tab-btn{padding:13px 16px;font-size:13px;font-weight:700;color:#a0aec0;background:none;border:none;cursor:pointer;border-bottom:3px solid transparent}
 .tab-btn.active{color:#1B4332;border-bottom-color:#40916C}
@@ -282,6 +288,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 <div id="adminApp">
   <div class="topbar">
     <h1>⚙️ Panel de Administrador — AniCare</h1>
+    <div class="modo-tabs" id="modoTabs">
+      <button class="modo-tab active verificacion" id="modoTabVerif" onclick="cambiarModoSistema('verificacion')">🔶 <span class="txt">Modo Verificación</span></button>
+      <button class="modo-tab" id="modoTabAuto" onclick="cambiarModoSistema('automatico')">🤖 <span class="txt">Modo Automático</span></button>
+    </div>
     <button onclick="cerrarSesion()">Cerrar sesión</button>
   </div>
   <div class="tabs">
@@ -415,6 +425,7 @@ async function intentarLogin(){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('adminApp').style.display='block';
     cargarCotizaciones();
+    cargarModoSistema();
   } catch(e){
     document.getElementById('loginError').style.display='block';
     document.getElementById('pwInput').value='';
@@ -436,8 +447,53 @@ window.onload=async function(){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('adminApp').style.display='block';
     cargarCotizaciones();
+    cargarModoSistema();
   }
 };
+
+// ===================== MODO DEL SISTEMA (Verificación / Automático) =====================
+// Ahora mismo esto solo guarda y muestra la preferencia — todavía no cambia el
+// comportamiento del envío automático ni de la confirmación de aprobación.
+// Eso se conecta en un paso aparte, una vez definido exactamente qué controla cada modo.
+var modoSistemaActual='verificacion';
+
+function pintarModoSistema(modo){
+  modoSistemaActual=modo;
+  var btnVerif=document.getElementById('modoTabVerif');
+  var btnAuto=document.getElementById('modoTabAuto');
+  if(btnVerif) btnVerif.classList.toggle('active',modo==='verificacion');
+  if(btnAuto) btnAuto.classList.toggle('active',modo==='automatico');
+  if(btnAuto) btnAuto.classList.toggle('automatico',modo==='automatico');
+}
+
+async function cargarModoSistema(){
+  try{
+    var s=getSupa();
+    var {data,error}=await s.from('configuracion_sistema').select('modo').eq('id',1).single();
+    if(error) throw error;
+    pintarModoSistema((data&&data.modo)||'verificacion');
+  } catch(e){
+    // Si la fila no existe todavía o hay un error de red, no se rompe el Panel Admin —
+    // simplemente se queda en Verificación (la opción más segura) hasta poder cargarla.
+    console.warn('No se pudo cargar el modo del sistema, usando Verificación por defecto:',e);
+    pintarModoSistema('verificacion');
+  }
+}
+
+async function cambiarModoSistema(nuevoModo){
+  if(nuevoModo===modoSistemaActual) return;
+  if(nuevoModo==='automatico'){
+    var ok=confirm('¿Cambiar a Modo Automático?\n\nLa IA calculará precios y avanzará el flujo sin que tengas que confirmar cada paso. Úsalo solo cuando ya hayas verificado que los precios automáticos están saliendo correctos.');
+    if(!ok) return;
+  }
+  try{
+    var s=getSupa();
+    var {error}=await s.from('configuracion_sistema').update({modo:nuevoModo,actualizado:new Date().toISOString()}).eq('id',1);
+    if(error) throw error;
+    pintarModoSistema(nuevoModo);
+    toast(nuevoModo==='automatico'?'🤖 Modo Automático activado':'🔶 Modo Verificación activado');
+  } catch(e){ toast('❌ No se pudo cambiar el modo: '+e.message); }
+}
 
 function toast(msg){
   var t=document.getElementById('toast');
@@ -1141,26 +1197,36 @@ async function modificarCotizacion(id){
 async function marcarAprobada(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return;
+  // Guarda primero cualquier precio que se haya escrito, para que "Aprobar" nunca
+  // descarte un ajuste manual sin guardar (ej. por nivel de suciedad).
+  if(q.estado==='cotizado') await guardarPrecios(id);
   try{
     var s=getSupa();
-    if(q.enviado_cliente){
-      // Ya se envió antes — aprobar de una vez
-      var {error}=await s.from('cotizaciones').update({estado:'aprobada',fecha_aprobada:new Date().toISOString()}).eq('id',id);
-      if(error) throw error;
-      q.estado='aprobada'; q.fecha_aprobada=new Date().toISOString();
-      toast('✅ Cotización marcada como Aprobada');
-      var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
-      if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
-    } else {
-      // Aún no se ha enviado al cliente — queda pendiente hasta que se envíe
-      var {error}=await s.from('cotizaciones').update({aprobacion_pendiente:true}).eq('id',id);
-      if(error) throw error;
-      q.aprobacion_pendiente=true;
-      toast('✅ Aprobación registrada — se confirmará cuando envíes la cotización al cliente');
-      renderCotizaciones();
-    }
+    // "Aprobar" manual es para cuando el cliente confirma por llamada (no por el
+    // link) — se marca Aprobada de inmediato, sin importar si ya se había enviado.
+    var {error}=await s.from('cotizaciones').update({estado:'aprobada',fecha_aprobada:new Date().toISOString(),aprobacion_pendiente:false}).eq('id',id);
+    if(error) throw error;
+    q.estado='aprobada'; q.fecha_aprobada=new Date().toISOString(); q.aprobacion_pendiente=false;
+    toast('✅ Cotización marcada como Aprobada');
+    var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
+    if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
     setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
   } catch(e){ toast('❌ Error: '+e.message); }
+}
+
+async function eliminarCotizacionPendiente(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  var ok=confirm('¿Eliminar la cotización '+(q.numero_cot||'')+' de '+nombreCliente(q)+'?\n\nEsta acción no se puede deshacer — la solicitud se borra por completo, no queda como cancelada.');
+  if(!ok) return;
+  try{
+    var s=getSupa();
+    var {error}=await s.from('cotizaciones').delete().eq('id',id);
+    if(error) throw error;
+    todasCotizaciones=todasCotizaciones.filter(function(x){return x.id!==id;});
+    toast('🗑️ Cotización eliminada');
+    renderCotizaciones();
+  } catch(e){ toast('❌ Error al eliminar: '+e.message); }
 }
 
 async function marcarPagada(id){
@@ -1368,17 +1434,12 @@ function revisarPendientesVencidos(){
     if(banner) banner.remove();
     return;
   }
-  var msg='🔔 Recordatorio AniCare\n\nTienes '+pendientesViejos.length+' cotización'+(pendientesViejos.length===1?'':'es')+' Pendiente'+(pendientesViejos.length===1?'':'s')+' con más de 12 horas sin precio:\n\n';
-  pendientesViejos.slice(0,10).forEach(function(q){
-    msg+='• '+(q.numero_cot||'')+' — '+nombreCliente(q)+'\n';
-  });
-  if(pendientesViejos.length>10) msg+='...y '+(pendientesViejos.length-10)+' más.';
-  var waLink='https://wa.me/50763171227?text='+encodeURIComponent(msg);
 
+  // Nota visual únicamente — el aviso real ya no depende de que hagas clic en nada;
+  // lo manda solo un cron job por correo a cleaningserviceani@gmail.com.
   var h='<div id="alertaPendientes" style="background:#FFF3CD;border:1.5px solid #F59E0B;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
   h+='<span style="font-size:22px">🔔</span>';
-  h+='<div style="flex:1;min-width:200px"><strong style="color:#78350F;font-size:13px">'+pendientesViejos.length+' cotización'+(pendientesViejos.length===1?'':'es')+' Pendiente'+(pendientesViejos.length===1?'':'s')+' hace más de 12 horas</strong><br><span style="font-size:11.5px;color:#92400E">Aún no tienen precio asignado — revísalas pronto.</span></div>';
-  h+='<a href="'+waLink+'" target="_blank" style="background:#25D366;color:white;text-decoration:none;padding:9px 14px;border-radius:9px;font-size:12.5px;font-weight:700;white-space:nowrap">📱 Enviarme Recordatorio</a>';
+  h+='<div style="flex:1;min-width:200px"><strong style="color:#78350F;font-size:13px">'+pendientesViejos.length+' cotización'+(pendientesViejos.length===1?'':'es')+' Pendiente'+(pendientesViejos.length===1?'':'s')+' hace más de 12 horas</strong><br><span style="font-size:11.5px;color:#92400E">Aún no tienen precio asignado — revísalas pronto. Ya recibiste (o recibirás) un correo con el detalle.</span></div>';
   h+='</div>';
 
   var cont=document.getElementById('viewCotizaciones');
@@ -1516,15 +1577,15 @@ function renderQuoteDetail(id){
 
         h+='<div class="price-row">';
         h+='<div class="price-info"><span class="svc-tag">'+svcName+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px"> · '+sugerenciaLabel+'</span>':'')+'<br>'+desc+'</div>';
-        if(cant > 1){
+        if(item.cant){
           h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
           h+='<span style="font-size:8px;font-weight:700;color:#40916C">Cantidad</span>';
-          h+='<div style="width:24px;height:24px;border-radius:50%;background:#52B788;color:white;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center">'+cant+'</div>';
+          h+='<div class="badge-cant-circle" style="width:24px;height:24px;border-radius:50%;background:#52B788;color:white;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center">'+cant+'</div>';
           h+='</div>';
         } else if(isArea && areaM2 > 0){
           h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
           h+='<span style="font-size:8px;font-weight:700;color:#1E40AF">Área</span>';
-          h+='<div style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px">'+areaM2.toFixed(1)+' m²</div>';
+          h+='<div class="badge-area-pill" style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px">'+areaM2.toFixed(1)+' m²</div>';
           h+='</div>';
         }
         h+='<div class="price-input-wrap">';
@@ -1535,8 +1596,16 @@ function renderQuoteDetail(id){
       });
     });
   } else {
-    // FORMATO ANTIGUO: array de strings
+    // FORMATO ANTIGUO: array de strings — cada elemento es un bloque de servicio
+    // completo (ej: "Colchones:\n  1. Cama | x1 | ...\n  2. ..."). Antes esta parte
+    // asumía que 'lines'/'svcKey'/'svcName'/'si' ya existían, pero nunca se creaban
+    // — por eso cualquier cotización con este formato tiraba error al abrirla.
     var servicios = serviciosRaw;
+    servicios.forEach(function(servicioTexto, si){
+    var lines = (servicioTexto||'').split('\n');
+    var svcName = (lines[0]||'').replace(':','').trim();
+    var svcKey = '';
+    for(var kBuscado in TIPOS_MAP){ if(TIPOS_MAP[kBuscado].nombre===svcName){ svcKey=kBuscado; break; } }
     for(var li=1;li<lines.length;li++){
       if(!lines[li].trim()) continue;
       var itemKey=si+'_'+li;
@@ -1602,6 +1671,7 @@ function renderQuoteDetail(id){
       h+='<div class="price-input-wrap"><span>$</span><input type="number" class="price-input" id="price-'+id+'-'+itemKey+'" data-svckey="'+(svcKey||'')+'" data-tipokey="'+tipoKey.replace(/"/g,'&quot;')+'" data-isarea="'+(isArea?'1':'0')+'" value="'+savedPrice+'" min="0" step="0.5" onchange="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'></div>';
       h+='</div>';
     }
+    });
   }
   h+='</div>';  // fin bloque else formato antiguo
 
@@ -1620,9 +1690,11 @@ function renderQuoteDetail(id){
   // Cotizado → Aprobada | Cancelada
   // Aprobada → Pagada | Cancelada
   if(q.estado==='cotizado'){
-    if(q.aprobacion_pendiente){
-      h+='<div style="background:#FFF3CD;border:1.5px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:11.5px;color:#78350F;font-weight:700">⏳ Aprobación registrada — envía la cotización al cliente para confirmarla</div>';
-    }
+    // Guardar precios — antes no existía en este estado, así que un ajuste manual
+    // (ej. por nivel de suciedad) no tenía forma de guardarse antes de Aprobar/Enviar.
+    h+='<div class="btn-row">';
+    h+='<button class="btn-save" onclick="guardarPrecios('+id+')">💾 Guardar Precios</button>';
+    h+='</div>';
     // Fila 1: Aprobar + Enviar al Cliente
     h+='<div class="estado-btns">';
     h+='<button class="btn-estado btn-aprobar" onclick="marcarAprobada('+id+')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="9.5"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>Aprobar</button>';
@@ -1633,7 +1705,7 @@ function renderQuoteDetail(id){
     h+='<button class="btn-estado btn-cancelar" onclick="abrirModalCancelar('+id+')">❌ Cancelar</button>';
     h+='<button class="btn-estado btn-pdf-inline" onclick="generarCotizacionPDF('+id+')">📄 PDF</button>';
     h+='</div>';
-    h+='<div class="estado-hint">💡 El cliente aprueba o rechaza desde su celular — el estado se actualiza solo. "Aprobar" manual solo se confirma después de enviar la cotización.</div>';
+    h+='<div class="estado-hint">💡 "Aprobar" es para cuando el cliente confirma por llamada — marca Aprobada de inmediato. Si prefieres que el cliente confirme desde su celular, usa "Enviar al Cliente" y el estado se actualizará solo cuando él responda.</div>';
     h+='<button class="btn-modificar" onclick="modificarCotizacion('+id+')">✏️ Modificar Cotización</button>';
   } else {
     if(q.estado==='pendiente'){
@@ -1643,6 +1715,9 @@ function renderQuoteDetail(id){
       h+='</div>';
       h+='<button class="btn-modificar" onclick="toggleRealizarCambios('+id+')">🔧 Realizar Cambios</button>';
       h+='<div id="editorCambios-'+id+'" style="display:none"></div>';
+      // Eliminar directo — para cuando el cliente se equivocó y esta solicitud
+      // ya no aplica (va a mandar otra). No hace falta cotizarla ni enviarla primero.
+      h+='<button class="btn-estado btn-cancelar" style="width:100%;margin-top:8px" onclick="eliminarCotizacionPendiente('+id+')">🗑️ Eliminar Cotización</button>';
     } else if(q.estado==='aprobada'){
       h+='<div class="btn-row">';
       h+='<button class="btn-save" onclick="guardarPrecios('+id+')">💾 Guardar Precios</button>';
@@ -1717,6 +1792,8 @@ function enviarFactura(id){
 async function enviarLinkAprobacion(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return;
+  // Misma red de seguridad que en marcarAprobada(): guarda el precio antes de enviar.
+  if(q.estado==='cotizado') await guardarPrecios(id);
   if(!q.token_aprobacion){
     toast('⚠️ Esta cotización no tiene token. Vuelve a guardar los precios.');
     return;
