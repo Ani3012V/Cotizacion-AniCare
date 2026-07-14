@@ -301,6 +301,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
     <button class="tab-btn active" id="tabCot" onclick="cambiarTab('cotizaciones')">📋 Cotizaciones</button>
     <button class="tab-btn" id="tabPrecios" onclick="cambiarTab('precios')">💲 Gestión de Precios</button>
     <button class="tab-btn" id="tabDirectorio" onclick="cambiarTab('directorio')">📇 Directorio</button>
+    <button class="tab-btn" id="tabIndicaciones" onclick="cambiarTab('indicaciones')">📖 Indicaciones</button>
   </div>
 
   <div class="page" id="viewCotizaciones">
@@ -331,6 +332,49 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
       <input type="text" class="dir-search" id="dirSearch" placeholder="🔍 Buscar por nombre, teléfono o RUC..." oninput="renderDirectorio()">
     </div>
     <div id="directorioLista"><div class="loading">Cargando directorio…</div></div>
+  </div>
+
+  <div class="page" id="viewIndicaciones" style="display:none">
+    <div style="max-width:820px;margin:0 auto">
+
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">📋 Qué hace cada pestaña</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Cotizaciones</b> — todas las solicitudes, organizadas en 5 estados (ver abajo). Aquí revisas, pones precios y avanzas cada una.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Gestión de Precios</b> — tu catálogo de tarifas por servicio. Lo que escribas aquí es lo que usa el sistema para calcular precios automáticos.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Directorio</b> — lista de todos tus clientes, con su historial de cotizaciones agrupado.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7"><b>Indicaciones</b> — esta pestaña, con la guía que estás leyendo ahora.</p>
+      </div>
+
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">🗂️ Qué significa cada estado en Cotizaciones</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Pendientes</b> — llegó la solicitud, pero le falta precio a al menos un ítem (el sistema no pudo calcularlo solo). Aquí lo pones tú a mano.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>⏳ Esperando Respuesta</b> — ya tiene todos los precios. Puedes ajustarlos y enviarla al cliente para que la apruebe.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>✅ Aprobadas</b> — el cliente confirmó (desde el link que le llega) o tú la marcaste aprobada manualmente (ej. te avisó por llamada). Queda pendiente de pago.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>💰 Pagadas</b> — orden ya cobrada y cerrada.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7"><b>❌ Orden Eliminada</b> — canceladas (por ti, o por falta de respuesta del cliente tras los 2 recordatorios automáticos).</p>
+      </div>
+
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">🧮 Cómo calcula el precio automático</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Cuando llega una solicitud, el sistema busca el precio de cada ítem en este orden — se detiene en el primero que encuentra:</p>
+        <ol style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:10px">
+          <li><b>Precio fijo por Tipo + Tamaño/Modelo</b> (ej: Colchones)</li>
+          <li><b>Precio fijo solo por Tipo</b> (ej: Sofás, Electro)</li>
+          <li><b>Precio por m²</b> — toma la medida que escribió el cliente, calcula el área, y multiplica por tu tarifa de $/m² para ese tipo (ej: Persianas, Pisos, Alfombras hoy)</li>
+          <li><b>Precio general por m²</b> — un respaldo genérico, casi nunca usado</li>
+        </ol>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px">Si no encuentra nada en ninguno de los 4 pasos, la cotización se queda en <b>Pendientes</b> para que le pongas el precio tú misma — <b>nunca inventa un número</b>.</p>
+        <div style="background:#FFF8E1;border-left:3px solid #F59E0B;border-radius:0 8px 8px 0;padding:10px 12px;margin-top:10px;font-size:11.5px;color:#78350F">
+          ⚠️ <b>Alfombras está a mitad de un cambio:</b> ya existen las nuevas Clasificaciones (Pequeña/Mediana/Grande/Extra Grande de precio fijo, y Alargada/Redonda/Modular por m²) en Gestión de Precios, pero el cálculo automático todavía usa el sistema viejo (por Tipo). Cuando se conecte, este aviso se actualizará.
+        </div>
+      </div>
+
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">🔘 Modo Verificación / Modo Automático</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7">El switch de arriba (junto a "Cerrar sesión") guarda tu preferencia entre revisar todo a mano o dejar que el sistema avance solo. Los precios se calculan igual en los dos modos — la diferencia es si tú confirmas cada paso o no.</p>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -509,9 +553,11 @@ function cambiarTab(tab){
   document.getElementById('tabCot').classList.toggle('active',tab==='cotizaciones');
   document.getElementById('tabPrecios').classList.toggle('active',tab==='precios');
   document.getElementById('tabDirectorio').classList.toggle('active',tab==='directorio');
+  document.getElementById('tabIndicaciones').classList.toggle('active',tab==='indicaciones');
   document.getElementById('viewCotizaciones').style.display=tab==='cotizaciones'?'block':'none';
   document.getElementById('viewPrecios').style.display=tab==='precios'?'block':'none';
   document.getElementById('viewDirectorio').style.display=tab==='directorio'?'block':'none';
+  document.getElementById('viewIndicaciones').style.display=tab==='indicaciones'?'block':'none';
   if(tab==='precios'){ cargarTodosPrecios(); }
   if(tab==='directorio'){ renderDirectorio(); }
 }
