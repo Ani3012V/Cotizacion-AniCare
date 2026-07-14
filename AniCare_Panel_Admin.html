@@ -369,6 +369,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
         </div>
       </div>
 
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">✋ Precios que SIEMPRE son manuales (no busques por qué no calculan solos — es a propósito)</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Estos 3 servicios están marcados como "precio por inspección" en el código — nunca van a calcular solos, sin importar qué tengas cargado en Gestión de Precios. Tú les pones el precio a mano en cada cotización, en Pendientes.</p>
+        <ul style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:10px">
+          <li><b>Limpieza Hogar</b> — incluye sus 2 variantes, "Limpieza Profunda" y "Limpieza Recurrente" (ambas manuales, no son servicios aparte)</li>
+          <li><b>Limpieza Comercial</b></li>
+          <li><b>Pulido de Pisos</b></li>
+        </ul>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7"><b>Todo lo demás sí debe calcular solo</b> — incluyendo Alfombra Modular, Alargada y Redonda (por m²), aunque a veces algo se cae a manual por un precio en $0 o una tarifa que falta, no porque esté diseñado así. Si ves algo de esta lista en Pendientes seguido, es normal; si ves algo fuera de esta lista en Pendientes casi siempre, vale la pena revisarlo.</p>
+      </div>
+
       <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px">
         <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">🔘 Modo Verificación / Modo Automático</h3>
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7">El switch de arriba (junto a "Cerrar sesión") guarda tu preferencia entre revisar todo a mano o dejar que el sistema avance solo. Los precios se calculan igual en los dos modos — la diferencia es si tú confirmas cada paso o no.</p>
@@ -2055,7 +2066,12 @@ function generarCotizacionPDF(id){
   if(!q) return;
   var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
   var subtotal=0;
-  rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; });
+  var hayPendientes=false;
+  rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; if(r.value===''||r.value===null) hayPendientes=true; });
+  if(hayPendientes){
+    var seguir=confirm('⚠️ Hay al menos un ítem sin precio asignado.\n\nEl PDF va a mostrar "Por definir" en vez de un monto para ese ítem.\n\n¿Generar el PDF de todas formas?');
+    if(!seguir) return;
+  }
   var desc=parseFloat(document.getElementById('descuento-'+id).value)||0;
   var baseImponible=Math.max(0,subtotal-desc);
   var aplicaItbmsEl=document.getElementById('aplicaItbms-'+id);
@@ -2191,14 +2207,17 @@ function generarCotizacionPDF(id){
       badgeHtml='<div class="badge-wrap"><span class="lbl" style="color:#1E40AF">Área</span><div class="badge-m2">'+esc(areaPill.textContent.trim())+'</div></div>';
     }
     if(!gruposPorServicio[svcName]){ gruposPorServicio[svcName]=[]; ordenServicios.push(svcName); }
-    gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0,esCant:!!cantCircle});
+    gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0,precioVacio:(r.value===''||r.value===null),esCant:!!cantCircle});
   });
   ordenServicios.forEach(function(svcName){
     var itemsSvc=gruposPorServicio[svcName];
     var tieneCant=itemsSvc.some(function(it){return it.esCant;});
     h+='<div class="svc-block"><div class="svc-header"><span>'+esc(svcName)+'</span>'+(tieneCant?'<span class="cant-col-lbl">Cantidad</span>':'')+'</div><div class="svc-items">';
     itemsSvc.forEach(function(it){
-      h+='<div class="svc-item">'+it.badge+'<div class="desc">'+it.desc+'</div><div class="price">$'+it.precio.toFixed(2)+'</div></div>';
+      var precioHtml = it.precioVacio
+        ? '<span style="color:#DC2626;font-weight:800">Por definir</span>'
+        : '$'+it.precio.toFixed(2);
+      h+='<div class="svc-item">'+it.badge+'<div class="desc">'+it.desc+'</div><div class="price">'+precioHtml+'</div></div>';
     });
     h+='</div></div>';
   });
@@ -2491,9 +2510,14 @@ async function guardarTodosPrecios(){
   var inputs=document.querySelectorAll('.precio-inp');
   var byTabla={tipo:[],area:[]};
   var count=0;
+  var ceros=0;
   inputs.forEach(function(inp){
     var val=parseFloat(inp.value);
-    if(!inp.value||isNaN(val)||val<0) return;
+    if(inp.value && !isNaN(val) && val<=0){ ceros++; return; }
+    // val<=0 (no solo <0): un precio de catálogo en $0 nunca es válido — si se
+    // guardara, la Edge Function lo tomaría como "ya tiene precio" y la cotización
+    // avanzaría sola sin que Ani la revise. Mejor tratarlo igual que un campo vacío.
+    if(!inp.value||isNaN(val)) return;
     var sk=inp.getAttribute('data-svc');
     var tk=inp.getAttribute('data-tk');
     var unidad=inp.getAttribute('data-unidad');
@@ -2501,7 +2525,11 @@ async function guardarTodosPrecios(){
     byTabla[tabla].push({svc:sk,tk:tk,val:val});
     count++;
   });
-  if(count===0){ toast('⚠️ No hay precios para guardar'); return; }
+  if(count===0 && ceros===0){ toast('⚠️ No hay precios para guardar'); return; }
+  if(ceros>0){
+    var seguir=confirm('⚠️ '+ceros+' campo(s) tienen $0.00 — un precio en $0 nunca es válido para el catálogo, así que NO se van a guardar (se ignoran, como si estuvieran vacíos).\n\n¿Continuar guardando los otros '+count+' precio(s) correctos?');
+    if(!seguir) return;
+  }
   try{
     var s=getSupa();
     // Save fixed prices → precios_tipo
