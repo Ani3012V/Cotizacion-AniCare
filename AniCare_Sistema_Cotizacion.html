@@ -3198,14 +3198,12 @@ async function compartirEmail(){
 }
 
 function cerrarExito(){
-  // Intenta cerrar la pestaña/ventana
-  window.close();
-  // Si el navegador no permite cerrarlo (abierto manualmente),
-  // oculta el overlay y limpia el formulario como alternativa
-  setTimeout(function(){
-    document.getElementById('successScreen').classList.remove('show');
-    nuevaSolicitud();
-  },300);
+  // Antes intentaba window.close() — casi nunca funciona en una pestaña abierta por
+  // navegación normal (solo funciona si el propio script la abrió), y el intento
+  // podía dejar la pantalla en un estado raro en blanco en algunos navegadores.
+  // Ahora simplemente resetea el formulario de una vez, sin intentar cerrar nada.
+  document.getElementById('successScreen').classList.remove('show');
+  nuevaSolicitud();
 }
 
 function nuevaSolicitud(){
