@@ -2527,6 +2527,20 @@ function validarFormulario(){
   return d;
 }
 
+// Evita que un intento se quede "colgado" para siempre si la conexión con
+// Supabase no responde (red lenta, corte momentáneo, etc.) — sin esto, el botón
+// de enviar podía quedar trabado indefinidamente sin ningún error visible.
+function conTimeout(promesa, ms, mensaje){
+  return Promise.race([
+    promesa,
+    new Promise(function(_, reject){
+      setTimeout(function(){
+        reject(new Error(mensaje||'La conexión tardó demasiado. Verifica tu internet e intenta de nuevo.'));
+      }, ms);
+    })
+  ]);
+}
+
 async function obtenerNumSesion(d){
   // Si ya se guardó exitosamente en esta sesión, reutilizar el mismo número (sin duplicar)
   if(_numCotSesion) return _numCotSesion;
@@ -2564,7 +2578,7 @@ async function crearCotizacion(){
   _enviando=true;
   bloquearBotones('⏳ Registrando cotización...');
   try{
-    var numCot=await obtenerNumSesion(d);
+    var numCot=await conTimeout(obtenerNumSesion(d), 15000);
     _datosParaEnvio=d;
     _numCotParaEnvio=numCot;
     mostrarModalEnvio();
@@ -2676,7 +2690,7 @@ async function enviarSolicitud(){
   }
   bloquearBotones('⏳ Enviando...');
   try{
-    var num=await obtenerNumSesion(d);
+    var num=await conTimeout(obtenerNumSesion(d), 15000);
     await enviarEmail(num,d);
     mostrarExito(num,'email');
   } catch(e){
@@ -2690,7 +2704,7 @@ async function btnWhatsApp(){
   var d=validarFormulario(); if(!d) return;
   bloquearBotones('⏳...');
   try{
-    var num=await obtenerNumSesion(d);
+    var num=await conTimeout(obtenerNumSesion(d), 15000);
     abrirWA(d,num);
     mostrarExito(num,'wa');
   } catch(e){
@@ -2929,7 +2943,7 @@ async function generarPDF(){
   var d=validarFormulario(); if(!d) return;
   bloquearBotones('⏳ Generando PDF...');
   try{
-    var numCot=await obtenerNumSesion(d);
+    var numCot=await conTimeout(obtenerNumSesion(d), 15000);
     var fecha=new Date().toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
     var h=construirHTMLPDF(d,numCot,fecha);
     var blob=new Blob([h],{type:'text/html'});
@@ -3242,6 +3256,10 @@ function nuevaSolicitud(){
   // Restaurar la columna derecha — irACheckout() la oculta y nadie la volvía a mostrar
   var colDerR=document.getElementById('colDer');
   if(colDerR) colDerR.style.display='';
+  // Restaurar la columna izquierda — el botón "Carrito" del encabezado (abrirVistaCarrito)
+  // también la oculta, y esta era la única función que nunca la devolvía a mostrar.
+  var colIzqR=document.querySelector('.col-izq');
+  if(colIzqR) colIzqR.style.display='';
   var colsR=document.querySelector('.cols');
   if(colsR) colsR.style.gridTemplateColumns='';
   var phR=document.getElementById('placeholderDer');
