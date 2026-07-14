@@ -51,6 +51,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 
 /* === ALERTA CLIENTE RECURRENTE (marcó Nuevo por error) === */
 .alerta-recurrente{background:#FFF3CD;border-left:3px solid #F59E0B;border-radius:0 8px 8px 0;padding:8px 12px;margin:8px 0;font-size:11px;color:#78350F;display:flex;align-items:center;gap:6px}
+.alerta-cruce{background:#E8F1FB;border-left:3px solid #2D6A9E;border-radius:0 8px 8px 0;padding:8px 12px;margin:8px 0;font-size:11px;color:#1B4368;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.alerta-cruce .chip-cot{background:#2D6A9E;color:white;font-weight:800;font-size:10px;padding:2px 8px;border-radius:10px;cursor:pointer;white-space:nowrap}
+.alerta-cruce .chip-cot:hover{background:#1B4368}
 
 /* === BOTONES DE ESTADO === */
 .estado-wrap{margin-top:14px;padding-top:14px;border-top:1px solid #f0f2f5}
@@ -532,10 +535,32 @@ function normalizar(str){
 function normalizarTel(tel){
   return (tel||'').toString().replace(/\D/g,'');
 }
+// Separa un nombre completo en {nombre: primera palabra, apellidos: [resto de palabras]}
+// para poder comparar nombre y apellido por separado (no como un solo bloque de texto).
+function partesNombre(nombreCompleto){
+  var palabras=normalizar(nombreCompleto).split(' ').filter(Boolean);
+  if(palabras.length===0) return {nombre:'',apellidos:[]};
+  return {nombre:palabras[0],apellidos:palabras.slice(1)};
+}
+// Coincide si el primer nombre es igual Y comparten AL MENOS un apellido
+// (cubre casos con apellido paterno + materno, donde solo uno puede coincidir).
+function nombreYApellidoCoinciden(nombreA,nombreB){
+  var pa=partesNombre(nombreA), pb=partesNombre(nombreB);
+  if(!pa.nombre||!pb.nombre||pa.nombre!==pb.nombre) return false;
+  if(pa.apellidos.length===0||pb.apellidos.length===0) return false;
+  return pa.apellidos.some(function(ap){ return pb.apellidos.indexOf(ap)>-1; });
+}
 
 // Determina si dos cotizaciones pertenecen al mismo cliente.
-// Empresarial: RUC primero, luego nombre de empresa.
-// Persona (Residencial/PH): Teléfono primero, luego nombre completo.
+//
+// EMPRESARIAL: mismo RUC Y mismo nombre/razón social (ambos a la vez).
+//
+// PERSONA (Residencial/PH): el nombre + apellido SIEMPRE tiene que coincidir primero
+// (no es suficiente por sí solo) — y además, al menos UNA de estas 3 señales de
+// respaldo debe coincidir: teléfono, correo, o nombre de PH/Residencial.
+// Si el nombre+apellido no coincide, nunca es el mismo cliente, sin importar qué
+// tanto coincida el resto (teléfono/correo no bastan solos).
+//
 // Nunca cruza Persona con Empresa.
 function mismoCliente(qa,qb){
   var aEmp=qa.cliente_tipo==='empresarial', bEmp=qb.cliente_tipo==='empresarial';
@@ -543,14 +568,21 @@ function mismoCliente(qa,qb){
 
   if(aEmp){
     var rucA=normalizar(qa.cliente_ruc), rucB=normalizar(qb.cliente_ruc);
-    if(rucA&&rucB) return rucA===rucB;
     var empA=normalizar(qa.cliente_empresa), empB=normalizar(qb.cliente_empresa);
-    return !!empA && empA===empB;
+    return !!rucA && !!rucB && rucA===rucB && !!empA && !!empB && empA===empB;
   } else {
+    if(!nombreYApellidoCoinciden(qa.cliente_nombre,qb.cliente_nombre)) return false;
+
     var telA=normalizarTel(qa.cliente_telefono), telB=normalizarTel(qb.cliente_telefono);
-    if(telA&&telB&&telA.length>=7) return telA===telB;
-    var nomA=normalizar(qa.cliente_nombre), nomB=normalizar(qb.cliente_nombre);
-    return !!nomA && nomA===nomB;
+    var telCoincide = !!telA && !!telB && telA.length>=7 && telA===telB;
+
+    var emailA=normalizar(qa.cliente_email), emailB=normalizar(qb.cliente_email);
+    var emailCoincide = !!emailA && !!emailB && emailA===emailB;
+
+    var phA=normalizar(qa.cliente_ph), phB=normalizar(qb.cliente_ph);
+    var phCoincide = !!phA && !!phB && phA===phB;
+
+    return telCoincide || emailCoincide || phCoincide;
   }
 }
 
@@ -681,7 +713,7 @@ function renderTimelineCardClickable(q,uid){
   var items=extraerItemsCotizacion(q);
   h+='<div class="tl-detail">';
   for(var ii=0;ii<items.length;ii++){
-    h+='<div class="tl-old-item"><div><span class="svc-tag">'+items[ii].svc+'</span>'+items[ii].desc+'</div><div class="price">$'+items[ii].precio.toFixed(2)+'</div></div>';
+    h+='<div class="tl-old-item"><div><span class="svc-tag">'+esc(items[ii].svc)+'</span>'+esc(items[ii].desc)+'</div><div class="price">$'+items[ii].precio.toFixed(2)+'</div></div>';
   }
   var totalHist=(q.total!==undefined&&q.total!==null)?q.total:items.reduce(function(s,it){return s+it.precio;},0);
   h+='<div class="tl-old-total"><span>Total</span><span>$'+parseFloat(totalHist).toFixed(2)+'</span></div>';
@@ -711,6 +743,28 @@ function detectarAlertaRecurrente(q){
   });
   if(historial.length===0) return null;
   return historial.length;
+}
+
+// Mismo teléfono, pero con un tipo de cuenta distinto (ej. la misma persona con
+// Residencial y también Empresa/PH) — no se fusiona al historial (son cuentas
+// distintas a propósito), solo se avisa para que Ani lo tenga presente.
+// Devuelve algo como: {ph:[{id,numero_cot}], empresarial:[...]} o null si no hay nada.
+function detectarOtroTipoMismoTelefono(q){
+  var telQ=normalizarTel(q.cliente_telefono);
+  if(!telQ||telQ.length<7) return null;
+  var porTipo={};
+  todasCotizaciones.forEach(function(o){
+    if(o.id===q.id) return;
+    if(o.cliente_tipo===q.cliente_tipo) return;
+    var telO=normalizarTel(o.cliente_telefono);
+    if(!telO||telO!==telQ) return;
+    if(!porTipo[o.cliente_tipo]) porTipo[o.cliente_tipo]=[];
+    // Evita listar el mismo número de cotización dos veces
+    if(!porTipo[o.cliente_tipo].some(function(x){return x.id===o.id;})){
+      porTipo[o.cliente_tipo].push({id:o.id,numero_cot:o.numero_cot});
+    }
+  });
+  return Object.keys(porTipo).length>0 ? porTipo : null;
 }
 
 // ============================================================
@@ -1455,6 +1509,22 @@ function filtrarEstado(chip,estado){
   renderCotizaciones();
 }
 
+// Salta a otra cotización desde un enlace (ej. el aviso de "mismo teléfono, otro
+// tipo de cuenta"). Si esa cotización vive en otra pestaña de filtro, cambia de
+// pestaña sola antes de abrirla.
+function irACotizacion(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q){ toast('❌ No se encontró esa cotización'); return; }
+  if(filtroActual!=='todos' && filtroActual!==q.estado){
+    var chip=document.querySelector('.filter-chip[data-estado="'+q.estado+'"]');
+    if(chip) filtrarEstado(chip,q.estado);
+  }
+  setTimeout(function(){
+    var card=document.getElementById('qcard-'+id);
+    if(card){ card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'}); }
+  },150);
+}
+
 function renderCotizaciones(){
   var list=todasCotizaciones;
   if(filtroActual!=='todos') list=list.filter(function(c){return c.estado===filtroActual;});
@@ -1469,6 +1539,7 @@ function renderCotizaciones(){
     var q=list[i];
     var fecha=new Date(q.fecha_creacion).toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
     var alertaCount=detectarAlertaRecurrente(q);
+    var otroTipo=detectarOtroTipoMismoTelefono(q);
 
     // Días transcurridos desde que se cotizó, sin pasar a Aprobada/Pagada/Cancelada
     var vencido=false;
@@ -1486,6 +1557,16 @@ function renderCotizaciones(){
     h+='<span class="q-chevron">▾</span></div>';
     if(alertaCount){
       h+='<div class="alerta-recurrente" style="margin:0 14px 8px">⚠️ <strong>Cliente Recurrente detectado</strong> — marcó "Nuevo" pero tiene '+alertaCount+' cotización'+(alertaCount===1?'':'es')+' aprobada'+(alertaCount===1?'':'s')+' anteriormente.</div>';
+    }
+    if(otroTipo){
+      var tipoLbl={residencial:'Residencial',ph:'PH',empresarial:'Empresa'};
+      var frases=Object.keys(otroTipo).map(function(tipo){
+        var chips=otroTipo[tipo].map(function(c){
+          return '<span class="chip-cot" onclick="event.stopPropagation();irACotizacion('+c.id+')">'+esc(c.numero_cot||'')+'</span>';
+        }).join(' ');
+        return 'de <strong>'+tipoLbl[tipo]+'</strong>: '+chips;
+      });
+      h+='<div class="alerta-cruce" style="margin:0 14px 8px">🔗 Este cliente también tiene solicitudes '+frases.join(' · ')+'.</div>';
     }
     h+='<div class="q-body" id="qbody-'+q.id+'"></div>';
     h+='</div>';
@@ -1576,7 +1657,7 @@ function renderQuoteDetail(id){
         var cant = item.cant || 1;
 
         h+='<div class="price-row">';
-        h+='<div class="price-info"><span class="svc-tag">'+svcName+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px"> · '+sugerenciaLabel+'</span>':'')+'<br>'+desc+'</div>';
+        h+='<div class="price-info"><span class="svc-tag">'+esc(svcName)+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px"> · '+esc(sugerenciaLabel)+'</span>':'')+'<br>'+esc(desc)+'</div>';
         if(item.cant){
           h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
           h+='<span style="font-size:8px;font-weight:700;color:#40916C">Cantidad</span>';
@@ -1656,7 +1737,7 @@ function renderQuoteDetail(id){
       var descResaltada=descTexto.replace(/\s*\|\s*x\d+\s*(?=\|)/i,'').replace(/^\s*x\d+\s*\|\s*/i,'');
 
       h+='<div class="price-row">';
-      h+='<div class="price-info"><span class="svc-tag">'+svcName+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px;text-transform:none;letter-spacing:normal"> · '+sugerenciaLabel+'</span>':'')+'<br>'+descResaltada+'</div>';
+      h+='<div class="price-info"><span class="svc-tag">'+esc(svcName)+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px;text-transform:none;letter-spacing:normal"> · '+esc(sugerenciaLabel)+'</span>':'')+'<br>'+esc(descResaltada)+'</div>';
       if(cantidad!==null){
         h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
         h+='<span style="font-size:8px;font-weight:700;color:#40916C;white-space:nowrap">Cantidad</span>';
@@ -1981,10 +2062,12 @@ function generarCotizacionPDF(id){
   h+='.svc-title-row .t2{font-size:11px;color:#4a5568}';
   h+='.svc-title-row .t2 b{color:#1B2838}';
   h+='.svc-block{margin-bottom:14px}';
-  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:11px;font-weight:800;color:#1B4332}';
+  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:11px;font-weight:800;color:#1B4332;display:flex;justify-content:space-between;align-items:center}';
+  h+='.svc-header .cant-col-lbl{font-size:9px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px}';
   h+='.svc-items{border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px}';
   h+='.svc-item{display:flex;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #F1F5F4}';
   h+='.svc-item:last-child{border-bottom:none}';
+  h+='.badge-num-plain{font-size:13px;font-weight:800;color:#1B4332;min-width:20px;text-align:center;flex-shrink:0;margin-right:10px}';
   h+='.badge-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;margin-right:10px}';
   h+='.badge-wrap .lbl{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}';
   h+='.badge-num{width:22px;height:22px;border-radius:50%;background:#1B4332;color:white;font-size:11px;font-weight:800;text-align:center;line-height:22px;flex-shrink:0}';
@@ -2057,16 +2140,18 @@ function generarCotizacionPDF(id){
     var areaPill=rowEl.querySelector('.badge-area-pill');
     var badgeHtml='';
     if(cantCircle){
-      badgeHtml='<div class="badge-wrap"><span class="lbl" style="color:#1B4332">Cantidad</span><div class="badge-num">'+esc(cantCircle.textContent.trim())+'</div></div>';
+      badgeHtml='<div class="badge-num-plain">'+esc(cantCircle.textContent.trim())+'</div>';
     } else if(areaPill){
       badgeHtml='<div class="badge-wrap"><span class="lbl" style="color:#1E40AF">Área</span><div class="badge-m2">'+esc(areaPill.textContent.trim())+'</div></div>';
     }
     if(!gruposPorServicio[svcName]){ gruposPorServicio[svcName]=[]; ordenServicios.push(svcName); }
-    gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0});
+    gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0,esCant:!!cantCircle});
   });
   ordenServicios.forEach(function(svcName){
-    h+='<div class="svc-block"><div class="svc-header">'+esc(svcName)+'</div><div class="svc-items">';
-    gruposPorServicio[svcName].forEach(function(it){
+    var itemsSvc=gruposPorServicio[svcName];
+    var tieneCant=itemsSvc.some(function(it){return it.esCant;});
+    h+='<div class="svc-block"><div class="svc-header"><span>'+esc(svcName)+'</span>'+(tieneCant?'<span class="cant-col-lbl">Cantidad</span>':'')+'</div><div class="svc-items">';
+    itemsSvc.forEach(function(it){
       h+='<div class="svc-item">'+it.badge+'<div class="desc">'+it.desc+'</div><div class="price">$'+it.precio.toFixed(2)+'</div></div>';
     });
     h+='</div></div>';
@@ -2134,6 +2219,19 @@ var PRECIOS_CONFIG = [
     {tipo:'Alfombra Pelo Largo (Shaggy)',med:'150 x 200 cm'},
     {tipo:'Alfombra Pelo Largo (Shaggy)',med:'200 x 300 cm'},
     {tipo:'Alfombras Modulares (Cuadrados precortados)',med:'Por m²'}
+   ]},
+  {key:'alfombras', domId:'alfombras_clasif', icon:'📏', nom:'Alfombras — Precio Fijo por Clasificación (NUEVO)', cols:['Clasificación','Precio'], unidad:'',
+   rows:[
+    {tipo:'Alfombra Pequeña (Accent & Doormats)'},
+    {tipo:'Alfombra Mediana'},
+    {tipo:'Alfombra Grande'},
+    {tipo:'Alfombra Extra Grande'}
+   ]},
+  {key:'alfombras', domId:'alfombras_clasif_m2', icon:'📐', nom:'Alfombras — Precio por m² (Alargada, Redonda, Modular)', cols:['Clasificación','Precio m²'], unidad:'m²',
+   rows:[
+    {tipo:'Alfombra Alargada (pasillos "Runners")'},
+    {tipo:'Alfombra Redonda o Circular'},
+    {tipo:'Alfombra Modular'}
    ]},
   {key:'colchones', icon:'🛏️', nom:'Colchones', cols:['Tipo','Tamaño / Modelo','Precio'], unidad:'',
    rows:[
@@ -2243,8 +2341,9 @@ function renderTodosPrecios(){
   var h='<div class="precios-grid">';
   for(var si=0;si<PRECIOS_CONFIG.length;si++){
     var svc=PRECIOS_CONFIG[si];
-    h+='<div class="precio-svc" id="svc-card-'+svc.key+'">';
-    h+='<div class="precio-svc-head" onclick="toggleServicio(\''+svc.key+'\')">';
+    var domId=svc.domId||svc.key; // domId evita choques de id en pantalla si dos secciones comparten el mismo servicio_key
+    h+='<div class="precio-svc" id="svc-card-'+domId+'">';
+    h+='<div class="precio-svc-head" onclick="toggleServicio(\''+domId+'\')">';
     h+='<span class="ico">'+svc.icon+'</span>';
     h+='<div class="info"><div class="nom">'+svc.nom+'</div>';
 
@@ -2265,13 +2364,13 @@ function renderTodosPrecios(){
       }
     }
     h+='</div>';
-    h+='<span class="chev" id="chev-'+svc.key+'">▸</span>';
+    h+='<span class="chev" id="chev-'+domId+'">▸</span>';
     h+='</div>'; // /precio-svc-head
 
     if(svc.manual){
-      h+='<div class="nota-manual" style="display:none" id="body-'+svc.key+'">📋 <strong>Precio por inspección.</strong> El costo se determina individualmente según trabajo hombre, tiempo, productos y equipo requeridos. El precio se ingresa directamente en cada cotización al recibirla.</div>';
+      h+='<div class="nota-manual" style="display:none" id="body-'+domId+'">📋 <strong>Precio por inspección.</strong> El costo se determina individualmente según trabajo hombre, tiempo, productos y equipo requeridos. El precio se ingresa directamente en cada cotización al recibirla.</div>';
     } else {
-      h+='<div class="precio-table-wrap" id="body-'+svc.key+'">';
+      h+='<div class="precio-table-wrap" id="body-'+domId+'">';
       h+='<table class="precio-table"><thead><tr>';
       for(var ci=0;ci<svc.cols.length;ci++){
         h+='<th>'+svc.cols[ci]+'</th>';
@@ -2317,21 +2416,22 @@ function toggleServicio(key){
 function toggleTodosServicios(){
   var btn=document.getElementById('btnToggleAll');
   var algunoColapsado=PRECIOS_CONFIG.some(function(svc){
-    var card=document.getElementById('svc-card-'+svc.key);
+    var card=document.getElementById('svc-card-'+(svc.domId||svc.key));
     return card && !card.classList.contains('expanded');
   });
   PRECIOS_CONFIG.forEach(function(svc){
-    var card=document.getElementById('svc-card-'+svc.key);
-    var chev=document.getElementById('chev-'+svc.key);
+    var domId=svc.domId||svc.key;
+    var card=document.getElementById('svc-card-'+domId);
+    var chev=document.getElementById('chev-'+domId);
     if(!card) return;
     if(algunoColapsado){
       card.classList.add('expanded');
       if(chev) chev.textContent='▾';
-      serviciosExpandidos[svc.key]=true;
+      serviciosExpandidos[domId]=true;
     } else {
       card.classList.remove('expanded');
       if(chev) chev.textContent='▸';
-      serviciosExpandidos[svc.key]=false;
+      serviciosExpandidos[domId]=false;
     }
   });
   btn.textContent=algunoColapsado?'▴ Colapsar todos':'▾ Expandir todos';

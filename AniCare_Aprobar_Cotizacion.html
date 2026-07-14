@@ -63,8 +63,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 var SUPA_URL='https://tsajcvsgnxxnmhubrxmr.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M';
 var sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-var FORMSPREE_ID = 'xkolbvwv';
-
 var TOKEN = new URLSearchParams(window.location.search).get('t');
 var quoteData = null;
 
@@ -101,21 +99,67 @@ async function cargar(){
   }
 }
 
+// Nombres de servicio para el formato nuevo (array de objetos). Deben coincidir
+// con las claves 'svc' que usa el formulario público y la Edge Function de precios.
+var TIPOS_NOMBRE = {
+  hogar:'Limpieza Hogar / Comercial', comercial:'Limpieza Comercial',
+  alfombras:'Alfombras o Moquetas', colchones:'Colchones',
+  persianas:'Persianas y Cortinas', pisos:'Pisos y Superficies',
+  pulido:'Pulido de Pisos', sofas:'Sofás y Muebles', electro:'Servicios Adicionales de Limpieza'
+};
+
+// Arma la línea descriptiva de un ítem (formato nuevo) a partir de los campos que
+// tenga presentes — mismo criterio que usa Panel Admin para mostrar cada ítem.
+function descItem(it){
+  var partes=[];
+  if(it.tipo) partes.push(it.tipo);
+  if(it.clasificacion) partes.push(it.clasificacion);
+  if(it.forma && it.forma!=='—') partes.push(it.forma);
+  if(it.tammod) partes.push(it.tammod);
+  if(it.puestos) partes.push(it.puestos);
+  if(it.sup) partes.push(it.sup);
+  if(it.medidas) partes.push(it.medidas);
+  if(it.area) partes.push(it.area+' m²');
+  if(it.cant && parseInt(it.cant,10)>1) partes.push('x'+it.cant);
+  if(it.motivos && it.motivos.length) partes.push(it.motivos.join(', '));
+  return partes.join(' · ');
+}
+
 function renderQuote(){
   var q = quoteData;
   var h = '<div class="q-num">N° '+esc(q.numero_cot)+'</div>';
   h += '<div class="q-client">Hola, '+esc(q.cliente_nombre)+' 👋</div>';
 
   var servicios = q.servicios || [];
-  for(var i=0;i<servicios.length;i++){
-    var lines = servicios[i].split('\n');
-    var svcName = lines[0].replace(':','');
-    h += '<div class="svc-block"><div class="svc-name">'+esc(svcName)+'</div>';
-    for(var li=1;li<lines.length;li++){
-      if(!lines[li].trim()) continue;
-      h += '<div class="svc-item">'+esc(lines[li].replace(/^\s*\d+\.\s*/,''))+'</div>';
+  var esFormatoObjeto = servicios.length>0 && typeof servicios[0]==='object';
+
+  if(esFormatoObjeto){
+    var grupos={}, orden=[];
+    servicios.forEach(function(it){
+      var key=(it.svc||'otros');
+      var nombre=TIPOS_NOMBRE[key]||key;
+      if(!grupos[nombre]){ grupos[nombre]=[]; orden.push(nombre); }
+      grupos[nombre].push(it);
+    });
+    orden.forEach(function(nombre){
+      h += '<div class="svc-block"><div class="svc-name">'+esc(nombre)+'</div>';
+      grupos[nombre].forEach(function(it){
+        h += '<div class="svc-item">'+esc(descItem(it))+'</div>';
+      });
+      h += '</div>';
+    });
+  } else {
+    // Formato antiguo (texto) — se mantiene por compatibilidad con cotizaciones viejas
+    for(var i=0;i<servicios.length;i++){
+      var lines = (servicios[i]||'').split('\n');
+      var svcName = lines[0].replace(':','');
+      h += '<div class="svc-block"><div class="svc-name">'+esc(svcName)+'</div>';
+      for(var li=1;li<lines.length;li++){
+        if(!lines[li].trim()) continue;
+        h += '<div class="svc-item">'+esc(lines[li].replace(/^\s*\d+\.\s*/,''))+'</div>';
+      }
+      h += '</div>';
     }
-    h += '</div>';
   }
 
   h += '<div class="totals">';
@@ -158,9 +202,13 @@ function toggleMotivoOtro(){
 
 async function notificarPorEmail(decision, motivo){
   try{
-    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+    await fetch(SUPA_URL+'/functions/v1/enviar-email', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer '+SUPA_KEY
+      },
       body: JSON.stringify({
         tipo:'cliente_respondio',
         numCot:quoteData.numero_cot,

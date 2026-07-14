@@ -818,10 +818,12 @@ function actualizarCampo(){
 // ===================== SERVICE CONFIG =====================
 var SVC={
   alfombras:{icon:'🪡',name:{es:'Alfombras o Moquetas',en:'Carpets & Moquettes'},
-    tipos_es:['Alfombra (General)','Alfombra Bucle (Bereber/Boucle)','Alfombra de Fibra Natural','Alfombra en Rollo (pared a pared)','Alfombra Pelo Corto (Texturizadas/Frisé)','Alfombra Pelo Largo (Shaggy)','Alfombras Modulares (Cuadrados precortados)'],
+    tipos_es:['Alfombra (General)','Alfombra Bucle (Berber o Pelo Rizado)','Alfombra Fibra Natural (Yute, Sisal, Lino y Cáñamo)','Alfombra en Rollo (pared a pared)','Alfombra Pelo Corto (Texturizadas/Frisé)','Alfombra Pelo Largo (Shaggy)','Alfombras Modulares (Módulos o cuadrados pre-cortados)'],
     tipos_en:['Loop Pile (Berber/Boucle)','Natural Fiber Carpet','Wall-to-Wall Roll','Modular Tiles','Long Pile (Shaggy)','Synthetic Carpet','Short Pile (Frisé/Textured)'],
-    formas:['Circular','Cuadrada','Rectangular','Runner'],
-    isTejido:true,hasSup:true,motivoKey:'alfombras',hasNivel:true},
+    formas:['Circular o redonda','Cuadrada','Rectangular','Alargada (pasillo)','Ovalada','Plana (continua de pared a pared)'],
+    clasificaciones_es:['Alfombra Pequeña (Accent & Doormats)','Alfombra Mediana','Alfombra Grande','Alfombra Extra Grande','Alfombra Alargada (pasillos "Runners")','Alfombra Redonda o Circular'],
+    clasificaciones_en:['Small Rug (Accent & Doormats)','Medium Rug','Large Rug','Extra Large Rug','Runner (Hallway)','Round or Circular Rug'],
+    isTejido:true,hasSup:true,hasClasificacion:true,motivoKey:'alfombras',hasNivel:true},
   colchones:{icon:'🛏️',name:{es:'Colchones',en:'Mattresses'},
     tipos_es:['Colchón','Cama','Box de Cama','Respaldar'],
     tipos_en:['Mattress','Bed','Box Spring','Headboard'],
@@ -1024,6 +1026,7 @@ function detalleItemCompacto(k, it){
   else if(k==='alfombras'){
     if(it.cant) partes.push('Cant: '+it.cant);
     if(it.tipo) partes.push(it.tipo);
+    if(it.clasificacion) partes.push(it.clasificacion);
     if(it.sup) partes.push(it.sup);
     if(it.forma&&it.forma!=='—') partes.push(it.forma);
     if(it.medidas) partes.push(it.medidas);
@@ -1094,6 +1097,7 @@ function renderCarritoCompacto(){
       var mainP=[];
       if(it.tipo) mainP.push(it.tipo);
       if(k==='alfombras'){
+        if(it.clasificacion) mainP.push(it.clasificacion);
         if(it.sup&&!it.medidas) mainP.push(it.sup);
         if(it.medidas) mainP.push(it.medidas);
       } else if(k==='colchones'){
@@ -1476,49 +1480,70 @@ function renderCard(s){
   }
 
   if(d.isTejido){
-    // ALFOMBRAS: Tipo de Tejido
-    h+='<div class="field"><label class="lbl">Tipo de Tejido</label><select id="f-tipo-'+s+'">'+topts+'</select></div>';
+    // ALFOMBRAS: TIPO
+    h+='<div class="field"><label class="lbl">TIPO</label><select id="f-tipo-'+s+'">'+topts+'</select></div>';
     // FORMA
     h+='<div class="field"><label class="lbl">Forma</label><select id="f-forma-'+s+'">';
     h+='<option value="">— Seleccione forma —</option>';
     var formas=d.formas||[];
     for(var fi=0;fi<formas.length;fi++) h+='<option>'+formas[fi]+'</option>';
     h+='</select></div>';
+    // CLASIFICACIÓN (obligatoria — define el precio)
+    h+='<div class="field"><label class="lbl">Clasificación</label><select id="f-clasif-'+s+'" onchange="actualizarVisibilidadM2Alfombra(\''+s+'\')">';
+    h+='<option value="">— Seleccione clasificación —</option>';
+    var clasifs=d[l==='en'?'clasificaciones_en':'clasificaciones_es']||d.clasificaciones_es||[];
+    for(var ci=0;ci<clasifs.length;ci++) h+='<option>'+clasifs[ci]+'</option>';
+    h+='</select></div>';
     // CANTIDAD + M² lado a lado
     h+='<div class="row2" style="grid-template-columns:120px 1fr">';
     h+='<div class="field"><label class="lbl">Cantidad</label>';
     h+='<input type="number" id="f-cant-'+s+'" value="1" min="1"></div>';
-    h+='<div class="field"><label class="lbl">Medida (M²)</label>';
+    h+='<div class="field"><label class="lbl">Medida (M²) <span style="font-weight:400;color:#94a3b8">— opcional, solo informativa</span></label>';
     h+='<select id="f-sup-'+s+'" onchange="checkOtraMedida(\''+s+'\')"><option value="">— Seleccione —</option>';
     h+='<optgroup label="📐 1. Pequeñas (Accent & Doormats)">';
     h+='<option>60 x 90 cm (2 x 3 pies)</option>';
+    h+='<option>60 x 110 cm (2 x 4 pies)</option>';
     h+='<option>90 x 150 cm (3 x 5 pies)</option>';
     h+='</optgroup>';
     h+='<optgroup label="📐 2. Medianas">';
     h+='<option>120 x 170 cm (4 x 6 pies)</option>';
-    h+='<option>160 x 230 cm (5 x 8 pies)</option>';
+    h+='<option>120 x 180 cm (4 x 6 pies)</option>';
+    h+='<option>150 x 150 cm (5 x 5 pies)</option>';
+    h+='<option>150 x 210 cm (5 x 7 pies)</option>';
+    h+='<option>150 x 230 cm (5 x 8 pies)</option>';
+    h+='<option>180 x 180 cm (6 x 6 pies)</option>';
     h+='</optgroup>';
     h+='<optgroup label="📐 3. Grandes">';
-    h+='<option>200 x 300 cm (6 x 9 pies)</option>';
-    h+='<option>240 x 340 cm (8 x 10 pies)</option>';
-    h+='<option>270 x 360 cm (9 x 12 pies)</option>';
+    h+='<option>180 x 270 cm (6 x 9 pies)</option>';
+    h+='<option>200 x 300 cm (7 x 10 pies)</option>';
+    h+='<option>240 x 300 cm (8 x 10 pies)</option>';
+    h+='<option>240 x 340 cm (8 x 11 pies)</option>';
     h+='</optgroup>';
     h+='<optgroup label="📐 4. Extra Grandes">';
-    h+='<option>300 x 400 cm (10 x 14 pies)</option>';
+    h+='<option>270 x 360 cm (9 x 12 pies)</option>';
+    h+='<option>300 x 400 cm (10 x 13 pies)</option>';
     h+='</optgroup>';
     h+='<optgroup label="📐 5. Alargadas (Pasilleras)">';
-    h+='<option>60 x 240 cm</option>';
-    h+='<option>80 x 300 cm</option>';
+    h+='<option>60 x 240 cm (2 x 8 pies)</option>';
+    h+='<option>60 x 108 cm (2 x 4 pies)</option>';
+    h+='<option>75 x 180 cm (2 x 6 pies)</option>';
+    h+='<option>75 x 240 cm (2 x 8 pies)</option>';
+    h+='<option>75 x 300 cm (2 x 10 pies)</option>';
+    h+='<option>80 x 300 cm (3 x 10 pies)</option>';
     h+='</optgroup>';
-    h+='<optgroup label="⭕ 5. Redondas (diámetro)">';
+    h+='<optgroup label="⭕ 6. Redondas (diámetro)">';
     h+='<option>Redonda Ø 120 cm</option>';
     h+='<option>Redonda Ø 150 cm</option>';
     h+='<option>Redonda Ø 200 cm</option>';
+    h+='</optgroup>';
+    h+='<optgroup label="🧩 7. Módulos (Alfombras Modulares)">';
+    h+='<option value="modulos_50x50">Módulos · 50 x 50 cm (standard)</option>';
     h+='</optgroup>';
     h+='<option value="otra">✏️ Otra medida (escribir)</option>';
     h+='</select></div>';
     h+='</div>'; // /row2
     h+='<div id="om-'+s+'" style="display:none;margin-top:6px"><input type="text" id="f-om-'+s+'" placeholder="Ej: 100 x 200 cm"></div>';
+    h+='<div id="om2-'+s+'" style="display:none;margin-top:6px"><label class="lbl">Escribir m² total a cubrir <span style="color:#e53e3e">(obligatoria para Módulos, Alargada y Redonda)</span></label><input type="text" id="f-om2-'+s+'" placeholder="Ej: 12 m²"></div>';
   } else {
     // TIPO GENÉRICO
     var tipoLabel=l==='en'?'Type':'Tipo';
@@ -1949,12 +1974,19 @@ function addItem(s){
   var errores=[];
 
   // Tipo siempre obligatorio (ya validado arriba)
-  // Forma obligatoria (alfombras)
+  // Forma obligatoria (alfombras); Medida ahora es opcional/informativa
   if(s==='alfombras'){
     var formaObEl=document.getElementById('f-forma-'+s);
     if(!formaObEl||!formaObEl.value) errores.push('Forma');
-    var supObEl=document.getElementById('f-sup-'+s);
-    if(!supObEl||!supObEl.value||supObEl.value==='') errores.push('Medidas / Tamaño de la alfombra');
+    var clasifObEl=document.getElementById('f-clasif-'+s);
+    if(!clasifObEl||!clasifObEl.value) errores.push('Clasificación');
+    var supObEl2=document.getElementById('f-sup-'+s);
+    var necesitaM2Val = (supObEl2&&supObEl2.value==='modulos_50x50') ||
+      (clasifObEl&&(clasifObEl.value==='Alfombra Alargada (pasillos "Runners")'||clasifObEl.value==='Alfombra Redonda o Circular'));
+    if(necesitaM2Val){
+      var om2ObEl=document.getElementById('f-om2-'+s);
+      if(!om2ObEl||!om2ObEl.value.trim()) errores.push('m² total a cubrir');
+    }
   }
   // Tamaño/Modelo obligatorio (colchones)
   if(cfg.hasTamañoModelo){
@@ -2015,6 +2047,7 @@ function addItem(s){
   var item={tipo:tipoVal};
 
   var formaEl=document.getElementById('f-forma-'+s); if(formaEl) item.forma=formaEl.value;
+  var clasifEl=document.getElementById('f-clasif-'+s); if(clasifEl&&clasifEl.value) item.clasificacion=clasifEl.value;
   var supEl=document.getElementById('f-sup-'+s);
   if(supEl){
     if(supEl.value==='otra'){
@@ -2022,6 +2055,17 @@ function addItem(s){
       item.sup=omEl?omEl.value:'';
     } else {
       item.sup=supEl.value;
+    }
+  }
+  // m² total a cubrir — Módulos (por Medida) o Clasificación Alargada/Redonda.
+  // Se guarda en item.area (campo numérico limpio) para que el cálculo de precio
+  // pueda usarlo directo, en vez de tener que extraerlo de un texto armado.
+  if(s==='alfombras'){
+    var necesitaM2Item = (supEl&&supEl.value==='modulos_50x50') ||
+      (clasifEl&&(clasifEl.value==='Alfombra Alargada (pasillos "Runners")'||clasifEl.value==='Alfombra Redonda o Circular'));
+    if(necesitaM2Item){
+      var om2El=document.getElementById('f-om2-'+s);
+      if(om2El&&om2El.value.trim()) item.area=om2El.value.trim();
     }
   }
   // Cantidad (all services)
@@ -2136,6 +2180,7 @@ function refreshList(s){
     var it=items[i];
     var parts=[it.tipo];
     if(it.forma) parts.push(it.forma);
+    if(it.clasificacion) parts.push(it.clasificacion);
     if(it.sup) parts.push(it.sup+' m²');
     if(it.cant) parts.push('x'+it.cant);
     if(it.tammod) parts.push(it.tammod);
@@ -2151,7 +2196,7 @@ function refreshList(s){
     if(it.telColor) parts.push('🎨 '+it.telColor);
     h+='<div class="item-row">';
     h+='<div class="item-num">'+(i+1)+'</div>';
-    h+='<div class="item-info">'+parts.join(' • ')+'</div>';
+    h+='<div class="item-info">'+escHtml(parts.join(' • '))+'</div>';
     h+='<button class="item-del" onclick="delItem(\''+s+'\','+i+')">✕</button>';
     h+='</div>';
   }
@@ -2332,6 +2377,7 @@ function recopilar(){
       var it=items[i];
       var p=[it.tipo];
       if(it.forma) p.push(it.forma);
+      if(it.clasificacion) p.push(it.clasificacion);
       if(it.sup) p.push(it.sup);
       if(it.cant) p.push('x'+it.cant);
       if(it.tammod) p.push(it.tammod);
@@ -2962,6 +3008,7 @@ function renderCart(){
       var mainParts=[];
       if(it.tipo) mainParts.push(it.tipo);
       if(s==='alfombras'){
+        if(it.clasificacion) mainParts.push(it.clasificacion);
         if(it.sup&&!it.medidas) mainParts.push(it.sup);
         if(it.medidas) mainParts.push(it.medidas);
       } else if(s==='colchones'){
@@ -3067,6 +3114,22 @@ function checkOtraMedida(s){
   var sel=document.getElementById('f-sup-'+s);
   var div=document.getElementById('om-'+s);
   if(div) div.style.display=(sel&&sel.value==='otra')?'block':'none';
+  actualizarVisibilidadM2Alfombra(s);
+}
+// El campo "m² total a cubrir" aplica en 2 casos: Módulos (por la Medida elegida)
+// o Clasificación = Alargada/Redonda (donde un precio fijo no tiene sentido porque
+// el tamaño varía mucho). Se revisan ambas condiciones juntas para que cambiar un
+// campo no le borre al otro la casilla ya mostrada.
+function actualizarVisibilidadM2Alfombra(s){
+  var supEl=document.getElementById('f-sup-'+s);
+  var clasifEl=document.getElementById('f-clasif-'+s);
+  var esModulo = !!(supEl && supEl.value==='modulos_50x50');
+  var esClasifVariable = !!(clasifEl && (
+    clasifEl.value==='Alfombra Alargada (pasillos "Runners")' ||
+    clasifEl.value==='Alfombra Redonda o Circular'
+  ));
+  var div2=document.getElementById('om2-'+s);
+  if(div2) div2.style.display=(esModulo||esClasifVariable)?'block':'none';
 }
 // ===================== INIT =====================
 window.onload=function(){
