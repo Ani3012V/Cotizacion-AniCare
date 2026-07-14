@@ -1005,6 +1005,23 @@ function formatPuestos(n){
   return n;
 }
 
+// Extrae el número de puestos de cualquier texto — soporta "6", "6 puestos",
+// "(6 puestos)", y compuestos como "3+2 puestos" (los suma: 5). Devuelve null si
+// el texto no tiene ningún número (ej: "Butaca", "Puff", "Otros").
+function extraerPuestos(texto){
+  if(!texto) return null;
+  var m=texto.match(/(\d+(?:\s*\+\s*\d+)*)\s*puestos?/i);
+  if(!m) return null;
+  var partes=m[1].split('+');
+  var total=0;
+  for(var i=0;i<partes.length;i++){
+    var n=parseInt(partes[i].trim());
+    if(isNaN(n)) return null;
+    total+=n;
+  }
+  return total;
+}
+
 function detalleItemCompacto(k, it){
   var partes=[];
 
@@ -2002,6 +2019,17 @@ function addItem(s){
   if(cfg.hasEspecifPuestos){
     var puEl=document.getElementById('f-puestos-'+s);
     if(!puEl||!puEl.value.trim()) errores.push('Cantidad de puestos');
+    else{
+      // Si el "Tipo" ya indica un número de puestos (ej. "Sofá en L (6 puestos)"),
+      // debe coincidir con lo que el cliente escribió — si no, es casi seguro un
+      // error de digitación y hay que pedirle que lo corrija antes de continuar.
+      var tipoElSofa=document.getElementById('f-tipo-'+s);
+      var puestosTipo=extraerPuestos(tipoElSofa?tipoElSofa.value:'');
+      var puestosEscritos=extraerPuestos(puEl.value);
+      if(puestosTipo!==null && puestosEscritos!==null && puestosTipo!==puestosEscritos){
+        errores.push('Cantidad de puestos no coincide con el Tipo seleccionado ("'+tipoElSofa.value+'" son '+puestosTipo+', escribiste '+puestosEscritos+')');
+      }
+    }
   }
   // Area obligatoria para Limpieza de piso con maquina rotativa
   if(s==='electro'){
