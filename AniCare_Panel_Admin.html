@@ -180,7 +180,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 
 .price-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5}
 .price-row:last-child{border-bottom:none}
-.price-info{flex:1;font-size:12px;color:#4a5568;line-height:1.5}
+.price-info{flex:1;font-size:12px;color:#4a5568;line-height:1.6;text-align:justify;padding-left:14px}
 .price-info .svc-tag{font-size:10px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px}
 .price-input-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .price-input-wrap span{font-size:13px;color:#718096}
@@ -273,7 +273,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
   <div class="login-box">
     <div class="ico">🔐</div>
     <h1>Panel de Administrador</h1>
-    <p>AniCare Cleaning Service</p>
+    <p>Cleaning Service & Ani Care</p>
     <div class="pw-wrap">
       <input type="password" id="pwInput" placeholder="••••••••" maxlength="30" onkeypress="if(event.key==='Enter')intentarLogin()">
       <button type="button" class="pw-eye" onclick="togglePwVis()" id="pwEye" title="Ver contraseña">
@@ -648,6 +648,13 @@ function buscarHistorialCliente(q,excluirId){
   return todasCotizaciones.filter(function(o){ return o.id!==exId && mismoCliente(q,o); });
 }
 
+function formatearFechaDDMM(fechaISO){
+  if(!fechaISO) return '';
+  var partes=fechaISO.split('-');
+  if(partes.length!==3) return fechaISO;
+  return partes[2]+'-'+partes[1]+'-'+partes[0];
+}
+
 function nombreCliente(q){
   return q.cliente_tipo==='empresarial' ? (q.cliente_empresa||q.cliente_nombre||'Sin nombre') : (q.cliente_nombre||'Sin nombre');
 }
@@ -709,9 +716,7 @@ function extraerItemsCotizacion(q){
     servicios.forEach(function(item,idx){
       var svcKey=item.svc||'';
       var svcName=(TIPOS_MAP[svcKey]&&TIPOS_MAP[svcKey].nombre)||svcKey;
-      var desc=item.tipo||'';
-      if(item.medidas) desc+=' | '+item.medidas;
-      if(item.area) desc+=' | '+item.area+' m²';
+      var desc=construirDescOrdenada(svcKey, item);
       var precio=item.precio||0;
       items.push({svc:svcName,desc:desc,precio:precio});
     });
@@ -1661,6 +1666,7 @@ function renderQuoteDetail(id){
   if(q.cliente_telefono) h+='<div><b>Teléfono:</b> '+q.cliente_telefono+'</div>';
   if(q.cliente_email) h+='<div><b>Correo:</b> '+q.cliente_email+'</div>';
   if(q.cliente_direccion) h+='<div><b>Dirección:</b> '+q.cliente_direccion+'</div>';
+  if(q.fecha_servicio) h+='<div><b>Fecha del servicio:</b> '+esc(formatearFechaDDMM(q.fecha_servicio))+'</div>';
   if(q.cliente_recurrente) h+='<div>⭐ Cliente Recurrente</div>';
   h+='</div>';
 
@@ -1681,18 +1687,27 @@ function renderQuoteDetail(id){
       svcsAgrupados[svcKey].push(item);
     });
 
-    Object.keys(svcsAgrupados).forEach(function(svcKey){
+    // Ordena los grupos: los que se cobran por m² (Área) van al final, no al inicio
+    var svcKeysOrdenados = Object.keys(svcsAgrupados).sort(function(a,b){
+      var aEsArea = SVCS_AREA[a] && !svcsAgrupados[a].some(function(it){return !!it.cant;});
+      var bEsArea = SVCS_AREA[b] && !svcsAgrupados[b].some(function(it){return !!it.cant;});
+      if(aEsArea===bEsArea) return 0;
+      return aEsArea ? 1 : -1;
+    });
+
+    var cantidadYaMostrada = false;
+    svcKeysOrdenados.forEach(function(svcKey){
       var items = svcsAgrupados[svcKey];
       var svcName = (TIPOS_MAP[svcKey] && TIPOS_MAP[svcKey].nombre) || svcKey;
+      var tieneCantGrupo = items.some(function(it){ return !!it.cant; });
+      var mostrarCantidadAqui = tieneCantGrupo && !cantidadYaMostrada;
+      if(mostrarCantidadAqui) cantidadYaMostrada = true;
+      h+='<div style="display:flex;align-items:center;padding:8px 4px 2px;font-size:10px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #E8F1EC;margin-bottom:2px">'+
+         '<span style="width:96px;flex-shrink:0;text-align:left">'+(mostrarCantidadAqui?'Cantidad':'')+'</span>'+
+         '<span>'+esc(svcName)+'</span></div>';
       items.forEach(function(item, idx){
         var itemKey = svcKey+'_'+idx;
-        var desc = item.tipo || '';
-        if(item.medidas) desc += ' | '+item.medidas;
-        if(item.sup) desc += ' | '+item.sup;
-        if(item.area) desc += ' | '+item.area+' m²';
-        if(item.cant && item.cant > 1) desc += ' | x'+item.cant;
-        if(item.nivTxt) desc += ' | Nivel:'+item.nivTxt;
-        if(item.motivos && item.motivos.length) desc += ' | '+item.motivos.join(', ');
+        var desc = construirDescOrdenada(svcKey, item);
 
         var precioActual = q.precios_detalle && q.precios_detalle[itemKey] !== undefined
           ? q.precios_detalle[itemKey]
@@ -1714,18 +1729,17 @@ function renderQuoteDetail(id){
         var cant = item.cant || 1;
 
         h+='<div class="price-row">';
-        h+='<div class="price-info"><span class="svc-tag">'+esc(svcName)+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px"> · '+esc(sugerenciaLabel)+'</span>':'')+'<br>'+esc(desc)+'</div>';
+        // Columna de 96px — igual al ancho del encabezado — para que la
+        // descripción de abajo quede alineada con el nombre del servicio de arriba
+        h+='<div style="display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;flex-shrink:0;width:96px">';
         if(item.cant){
-          h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
-          h+='<span style="font-size:8px;font-weight:700;color:#40916C">Cantidad</span>';
-          h+='<div class="badge-cant-circle" style="width:24px;height:24px;border-radius:50%;background:#52B788;color:white;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center">'+cant+'</div>';
-          h+='</div>';
+          h+='<div class="badge-cant-circle" style="font-size:14px;font-weight:800;color:#1B4332;text-align:left;padding-left:14px">'+cant+'</div>';
         } else if(isArea && areaM2 > 0){
-          h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
-          h+='<span style="font-size:8px;font-weight:700;color:#1E40AF">Área</span>';
-          h+='<div class="badge-area-pill" style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px">'+areaM2.toFixed(1)+' m²</div>';
-          h+='</div>';
+          h+='<span style="font-size:8px;font-weight:700;color:#1E40AF;padding-left:14px">Área</span>';
+          h+='<div class="badge-area-pill" style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px;margin-left:14px">'+areaM2.toFixed(1)+' m²</div>';
         }
+        h+='</div>';
+        h+='<div class="price-info" style="padding-left:0">'+(sugerenciaLabel?'<span style="color:#1E3A8A;font-weight:800;font-size:10px">🧠 '+esc(sugerenciaLabel)+'</span><br>':'')+'<span class="desc-text">'+esc(desc)+'</span></div>';
         h+='<div class="price-input-wrap">';
         h+='<span class="currency">$</span>';
         h+='<input type="number" class="price-input" id="price-'+id+'-'+itemKey+'" data-key="'+itemKey+'" data-svc="'+svcKey+'" data-id="'+id+'" value="'+(precioActual||'')+'" placeholder="0.00" min="0" step="0.01" oninput="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'>';
@@ -1794,14 +1808,14 @@ function renderQuoteDetail(id){
       var descResaltada=descTexto.replace(/\s*\|\s*x\d+\s*(?=\|)/i,'').replace(/^\s*x\d+\s*\|\s*/i,'');
 
       h+='<div class="price-row">';
-      h+='<div class="price-info"><span class="svc-tag">'+esc(svcName)+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px;text-transform:none;letter-spacing:normal"> · '+esc(sugerenciaLabel)+'</span>':'')+'<br>'+esc(descResaltada)+'</div>';
+      h+='<div class="price-info"><span class="svc-tag">'+esc(svcName)+'</span>'+(sugerenciaLabel?' <span style="color:#1E3A8A;font-weight:800;font-size:10px;text-transform:none;letter-spacing:normal"> · '+esc(sugerenciaLabel)+'</span>':'')+'<br><span class="desc-text">'+esc(descResaltada)+'</span></div>';
       if(cantidad!==null){
-        h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
+        h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;width:48px">';
         h+='<span style="font-size:8px;font-weight:700;color:#40916C;white-space:nowrap">Cantidad</span>';
         h+='<div class="badge-cant-circle" style="width:24px;height:24px;border-radius:50%;background:#52B788;color:white;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center">'+cantidad+'</div>';
         h+='</div>';
       } else if(isArea&&areaM2>0){
-        h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:42px">';
+        h+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;width:48px">';
         h+='<span style="font-size:8px;font-weight:700;color:#1E40AF;white-space:nowrap">Área</span>';
         h+='<div class="badge-area-pill" style="background:#BFDBFE;color:#1E3A8A;font-weight:700;font-size:11px;border-radius:8px;padding:4px 9px;white-space:nowrap">'+areaM2.toFixed(1)+' m²</div>';
         h+='</div>';
@@ -1815,7 +1829,8 @@ function renderQuoteDetail(id){
 
   h+='<div class="totals-box">';
   h+='<div class="total-line"><span>Subtotal</span><span id="subtotal-'+id+'">$0.00</span></div>';
-  h+='<div class="discount-row"><span style="font-size:12px;color:#2D6A4F">Descuento $</span><input type="number" id="descuento-'+id+'" value="'+(q.descuento||0)+'" min="0" step="0.5" onchange="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'></div>';
+  h+='<div class="discount-row"><span style="font-size:12px;color:#2D6A4F">Descuento $</span><input type="number" id="descuento-'+id+'" value="'+(q.descuento||0)+'" min="0" step="0.5" onchange="recalcularTotal('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'>'+
+     '<span style="font-size:12px;color:#2D6A4F;margin-left:10px">Descuento %</span><input type="number" id="descuentoPct-'+id+'" placeholder="0" min="0" max="100" step="1" oninput="aplicarDescuentoPct('+id+')"'+(q.estado==='cancelada'?' readonly disabled':'')+'></div>';
   h+='<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#2D6A4F;padding:8px 0;cursor:pointer">';
   h+='<input type="checkbox" id="aplicaItbms-'+id+'" '+(q.aplica_itbms?'checked':'')+' onchange="recalcularTotal('+id+')" style="width:16px;height:16px;cursor:pointer"'+(q.estado==='cancelada'?' disabled':'')+'>';
   h+='Aplicar ITBMS (7%) — solo si corresponde para este servicio';
@@ -1911,10 +1926,25 @@ function recalcularTotal(id){
   document.getElementById('total-'+id).textContent='$'+total.toFixed(2);
 }
 
+// Descuento % — calcula el monto en $ a partir del porcentaje escrito (ej: 10 -> 10%
+// del subtotal) y lo pone directo en el campo de Descuento $, sin que Ani tenga que
+// sacar la cuenta a mano.
+function aplicarDescuentoPct(id){
+  var pctEl=document.getElementById('descuentoPct-'+id);
+  var pct=pctEl?(parseFloat(pctEl.value)||0):0;
+  var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
+  var subtotal=0;
+  rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; });
+  var descuentoCalculado=Math.round(subtotal*(pct/100)*100)/100;
+  var descEl=document.getElementById('descuento-'+id);
+  if(descEl) descEl.value=descuentoCalculado;
+  recalcularTotal(id);
+}
+
 function enviarFactura(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return;
-  var msg = '🌟 *AniCare Cleaning Service*\n\n';
+  var msg = '🌟 *Cleaning Service & Ani Care*\n\n';
   msg += 'Hola '+nombreCliente(q)+' 👋\n\n';
   msg += '¡Gracias por tu pago! Tu factura de la cotización N° *'+q.numero_cot+'* ha sido procesada:\n';
   msg += '💰 Total pagado: *$'+(q.total||0).toFixed(2)+'*'+(q.aplica_itbms?' (ITBMS incluido)':'')+'\n\n';
@@ -1937,7 +1967,7 @@ async function enviarLinkAprobacion(id){
     return;
   }
   var linkAprobacion = GITHUB_BASE_URL+'AniCare_Aprobar_Cotizacion.html?t='+q.token_aprobacion;
-  var msg = '🌟 *AniCare Cleaning Service*\n\n';
+  var msg = '🌟 *Cleaning Service & Ani Care*\n\n';
   msg += 'Hola '+nombreCliente(q)+' 👋\n\n';
   msg += 'Tu cotización N° *'+q.numero_cot+'* está lista:\n';
   msg += '💰 Total: *$'+(q.total||0).toFixed(2)+'*'+(q.aplica_itbms?' (ITBMS incluido)':'')+'\n\n';
@@ -2103,7 +2133,7 @@ function generarCotizacionPDF(id){
   h+='.header .logo-box{background:white;border-radius:12px;padding:6px;flex-shrink:0;margin-right:16px}';
   h+='.header .logo-box img{height:44px;width:auto;display:block}';
   h+='.header .brand{flex:1}';
-  h+='.header .brand h1{color:white;font-size:18px;font-weight:800;margin-bottom:7px}';
+  h+='.header .brand h1{color:white;font-size:20px;font-weight:800;margin-bottom:7px}';
   h+='.header .contact-row{font-size:9.5px;color:rgba(255,255,255,.8)}';
   h+='.header .contact-item{display:inline-block;margin-right:14px}';
   h+='.header .qbox{background:white;border-radius:10px;padding:10px 16px;text-align:right;flex-shrink:0}';
@@ -2111,37 +2141,39 @@ function generarCotizacionPDF(id){
   h+='.header .qbox .num{color:#16202C;font-size:16px;font-weight:900;margin-top:2px}';
   h+='.header .qbox .date{color:#94A3B8;font-size:8.5px;margin-top:2px}';
   h+='.pad{padding:20px 26px}';
-  h+='.sec-title{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
+  h+='.sec-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
   h+='.client-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:8px}';
-  h+='.client-item{font-size:11.5px;color:#4a5568}';
+  h+='.client-item{font-size:11px;color:#4a5568}';
   h+='.client-item b{color:#1B2838;font-weight:700}';
   h+='.pago-row{font-size:11.5px;color:#4a5568;margin-bottom:16px}';
   h+='.pago-row b{color:#1B2838}';
   h+='.obs-box{background:#FEF3E2;border-left:3px solid #D97706;border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:20px;font-size:11.5px;color:#78350F;line-height:1.6}';
   h+='.obs-box .t{font-size:9.5px;font-weight:800;color:#B45309;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}';
   h+='.svc-title-row{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
-  h+='.svc-title-row .t1{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332}';
+  h+='.svc-title-row .t1{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332}';
   h+='.svc-title-row .t2{font-size:11px;color:#4a5568}';
   h+='.svc-title-row .t2 b{color:#1B2838}';
   h+='.svc-block{margin-bottom:14px}';
-  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:11px;font-weight:800;color:#1B4332;display:flex;justify-content:space-between;align-items:center}';
-  h+='.svc-header .cant-col-lbl{font-size:9px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px}';
+  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:11px;font-weight:800;color:#1B4332;display:flex;align-items:center}';
+  h+='.svc-header .cant-col-lbl{font-size:13px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;width:60px;flex-shrink:0;margin-right:14px}';
+  h+='.svc-header .svc-name-flex{flex:1}';
+  h+='.svc-header .price-col-lbl{font-size:13px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}';
   h+='.svc-items{border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px}';
   h+='.svc-item{display:flex;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #F1F5F4}';
   h+='.svc-item:last-child{border-bottom:none}';
-  h+='.badge-num-plain{font-size:13px;font-weight:800;color:#1B4332;min-width:20px;text-align:center;flex-shrink:0;margin-right:10px}';
-  h+='.badge-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;margin-right:10px}';
+  h+='.badge-num-plain{font-size:13px;font-weight:800;color:#1B4332;width:60px;text-align:left;flex-shrink:0;margin-right:14px}';
+  h+='.badge-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;flex-shrink:0;width:60px;margin-right:14px}';
   h+='.badge-wrap .lbl{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}';
   h+='.badge-num{width:22px;height:22px;border-radius:50%;background:#1B4332;color:white;font-size:11px;font-weight:800;text-align:center;line-height:22px;flex-shrink:0}';
   h+='.badge-m2{background:#DBEAFE;color:#1E40AF;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:12px;flex-shrink:0;height:fit-content;white-space:nowrap}';
-  h+='.svc-item .desc{font-size:11.5px;color:#4a5568;line-height:1.5;flex:1}';
-  h+='.svc-item .price{font-size:12.5px;font-weight:800;color:#1B2838;white-space:nowrap;margin-left:10px}';
+  h+='.svc-item .desc{font-size:12px;color:#4a5568;line-height:1.5;flex:1;text-align:justify;margin-right:16px}';
+  h+='.svc-item .price{font-size:12px;font-weight:800;color:#1B2838;white-space:nowrap}';
   h+='.totals{margin-top:16px}';
   h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 0}';
   h+='.t-final-box{background:#FEF3E2;border-radius:10px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}';
   h+='.t-final-box .lbl{font-size:14px;font-weight:800;color:#1B2838}';
-  h+='.t-final-box .val{font-size:22px;font-weight:900;color:#1B2838}';
-  h+='.garantia{background:#F0FAF4;border:1.5px solid #40916C;border-radius:10px;padding:12px 16px;margin-top:16px;font-size:11px;color:#1B4332;line-height:1.7}';
+  h+='.t-final-box .val{font-size:16px;font-weight:900;color:#1B2838}';
+  h+='.garantia{background:#F0FAF4;border:1.5px solid #40916C;border-radius:10px;padding:12px 16px;margin-top:16px;font-size:12px;color:#1B4332;line-height:1.7}';
   h+='.garantia b{color:#1B4332}';
   h+='.footer{text-align:center;font-size:10px;color:#718096;margin-top:20px;border-top:1px solid #E2E8F0;padding-top:14px}';
   h+='.footer-row{margin-bottom:6px}';
@@ -2151,7 +2183,7 @@ function generarCotizacionPDF(id){
   // ── Encabezado oscuro con logo, contactos e info de cotización ──
   h+='<div class="header">';
   h+='<div class="logo-box"><img src="'+LOGO_BASE64+'" alt="AniCare"></div>';
-  h+='<div class="brand"><h1>AniCare Cleaning Service</h1>';
+  h+='<div class="brand"><h1>Cleaning Service & Ani Care</h1>';
   h+='<div class="contact-row">';
   h+='<span class="contact-item" style="color:white">'+ICON_MAIL+'cleaningserviceanicare.com</span>';
   h+='<span class="contact-item" style="color:white">'+ICON_MAIL+'cleaningserviceani@gmail.com</span>';
@@ -2171,6 +2203,7 @@ function generarCotizacionPDF(id){
   if(q.cliente_direccion) h+='<div class="client-item"><b>Dirección:</b> '+esc(q.cliente_direccion)+'</div>';
   if(q.cliente_email) h+='<div class="client-item"><b>Correo:</b> '+esc(q.cliente_email)+'</div>';
   if(q.cliente_corregimiento) h+='<div class="client-item"><b>Corregimiento:</b> '+esc(q.cliente_corregimiento)+'</div>';
+  if(q.fecha_servicio) h+='<div class="client-item" style="grid-column:1/-1"><div style="display:inline-flex;align-items:center;gap:6px;background:#FEF3E2;border:1.5px solid #B45309;border-radius:8px;padding:6px 12px;margin-top:2px"><span style="font-size:13px">📅</span><b style="color:#78350F">Fecha autorizada del Servicio:</b> <span style="font-weight:800;color:#1B2838">'+esc(formatearFechaDDMM(q.fecha_servicio))+'</span></div></div>';
   h+='</div>';
   if(q.metodo_pago) h+='<div class="pago-row"><b>Método de pago:</b> '+esc(q.metodo_pago)+'</div>';
 
@@ -2179,10 +2212,8 @@ function generarCotizacionPDF(id){
     h+='<div class="obs-box"><div class="t">Observaciones del Cliente</div>'+esc(q.observaciones)+'</div>';
   }
 
-  // ── Título de servicios + fecha alineada a la derecha ──
-  h+='<div class="svc-title-row"><span class="t1">Servicios Solicitados</span>';
-  if(q.fecha_servicio) h+='<span class="t2"><b>Fecha del servicio:</b> '+esc(q.fecha_servicio)+'</span>';
-  h+='</div>';
+  // ── Título de servicios ──
+  h+='<div class="svc-title-row" style="margin-top:14px"><span class="t1">Servicios Solicitados</span></div>';
 
   // ── Servicios agrupados con círculo numerado o insignia m² ──
   var gruposPorServicio={};
@@ -2191,9 +2222,10 @@ function generarCotizacionPDF(id){
     var rowEl=r.closest('.price-row');
     if(!rowEl) return;
     var infoEl=rowEl.querySelector('.price-info');
-    var svcTag=infoEl?infoEl.querySelector('.svc-tag'):null;
-    var svcName=svcTag?svcTag.textContent.split('·')[0].trim():'Servicio';
-    var descHtml=infoEl?infoEl.innerHTML.split('<br>')[1]||'':'';
+    var svcKeyRow=r.getAttribute('data-svc')||'';
+    var svcName=(TIPOS_MAP[svcKeyRow]&&TIPOS_MAP[svcKeyRow].nombre)||'Servicio';
+    var descEl=infoEl?infoEl.querySelector('.desc-text'):null;
+    var descHtml=descEl?descEl.innerHTML:'';
     // Quita "Nivel:X" (nivel de suciedad) y "xN" (cantidad, ya va en la insignia) del texto
     descHtml=descHtml.replace(/\s*\|\s*Nivel:[^|]*/i,'');
     descHtml=descHtml.replace(/\s*\|\s*x\d+\s*(?=\|)/i,'');
@@ -2209,10 +2241,16 @@ function generarCotizacionPDF(id){
     if(!gruposPorServicio[svcName]){ gruposPorServicio[svcName]=[]; ordenServicios.push(svcName); }
     gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0,precioVacio:(r.value===''||r.value===null),esCant:!!cantCircle});
   });
+  var cantidadYaMostradaPDF=false;
+  var precioYaMostradoPDF=false;
   ordenServicios.forEach(function(svcName){
     var itemsSvc=gruposPorServicio[svcName];
     var tieneCant=itemsSvc.some(function(it){return it.esCant;});
-    h+='<div class="svc-block"><div class="svc-header"><span>'+esc(svcName)+'</span>'+(tieneCant?'<span class="cant-col-lbl">Cantidad</span>':'')+'</div><div class="svc-items">';
+    var mostrarCantidadAquiPDF = tieneCant && !cantidadYaMostradaPDF;
+    if(mostrarCantidadAquiPDF) cantidadYaMostradaPDF=true;
+    var mostrarPrecioAquiPDF = !precioYaMostradoPDF;
+    if(mostrarPrecioAquiPDF) precioYaMostradoPDF=true;
+    h+='<div class="svc-block"><div class="svc-header">'+(mostrarCantidadAquiPDF?'<span class="cant-col-lbl">Cantidad</span>':'<span class="cant-col-lbl"></span>')+'<span class="svc-name-flex">'+esc(svcName)+'</span>'+(mostrarPrecioAquiPDF?'<span class="price-col-lbl">Precio</span>':'')+'</div><div class="svc-items">';
     itemsSvc.forEach(function(it){
       var precioHtml = it.precioVacio
         ? '<span style="color:#DC2626;font-weight:800">Por definir</span>'
@@ -2231,9 +2269,11 @@ function generarCotizacionPDF(id){
   h+='</div>';
 
   // ── Garantía ──
-  h+='<div class="garantia"><b>✓ Garantía de Servicio</b> — AniCare Cleaning Service se compromete a brindar respaldo total a la calidad de su servicio. En caso de cualquier inconformidad, contamos con una garantía válida por siete (7) días calendario contados a partir de la fecha de entrega del servicio.';
+  h+='<div class="garantia"><b>✓ Garantía de Servicio</b> — Cleaning Service & Ani Care se compromete a brindar respaldo total a la calidad de su servicio. En caso de cualquier inconformidad, contamos con una garantía válida por siete (7) días calendario contados a partir de la fecha de entrega del servicio.';
   if(aplicaItbms) h+='<br><b>✓ ITBMS (7%)</b> aplicado según Art. 1057-V del Código Fiscal de Panamá.';
   h+='</div>';
+
+  h+='<div style="background:#FEF3E2;border:1.5px solid #D97706;border-radius:10px;padding:12px 16px;margin-top:10px;font-size:12px;color:#78350F;line-height:1.7"><b>ℹ️ Política de reprogramación</b> — Sabemos que los planes cambian, y está bien — solo te pedimos avisarnos con tiempo. Si necesitas reprogramar o cancelar tu servicio a último momento, o si nuestro técnico llega al lugar acordado sin haber recibido aviso previo, se aplicará un cargo de $20.00 por el tiempo y desplazamiento del equipo.</div>';
 
   h+='</div>'; // /pad
 
@@ -2354,25 +2394,23 @@ var PRECIOS_CONFIG = [
     {tipo:'Limpieza de piso con máquina rotativa'},
     {tipo:'Microondas'},{tipo:'Refrigeradora'}
    ]},
-  {key:'sofas', icon:'🛋️', nom:'Sofás y Muebles', cols:['Tipo','N° Puestos','Precio'], unidad:'',
+  {key:'sofas', icon:'🛋️', nom:'Sofás — Precio por Cantidad de Puestos (NUEVO)', cols:['Puestos','Precio'], unidad:'',
    rows:[
-    {tipo:'Butaca',med:'1 puesto'},
-    {tipo:'Poltrona',med:'1 puesto'},
-    {tipo:'Puff',med:'—'},
-    {tipo:'Silla de comedor',med:'—'},
-    {tipo:'Sofá o Sillón 1 puesto',med:'1 puesto'},
-    {tipo:'Sofá de 2 puestos',med:'2 puestos'},
-    {tipo:'Sofá de 3 puestos',med:'3 puestos'},
-    {tipo:'Sofá en L (3+2 puestos)',med:'3+2 puestos'},
-    {tipo:'Sofá en L (6 puestos)',med:'6 puestos'},
-    {tipo:'Sofá Cama',med:'—'},
-    {tipo:'Sofá Diván',med:'—'},
-    {tipo:'Sofá Ergonómico (reclinable y asiento extensible)',med:'—'},
-    {tipo:'Sofá Futón',med:'—'},
-    {tipo:'Sofá Modular',med:'Por módulo'},
-    {tipo:'Otros',med:'—'}
+    {tipo:'1 puesto'},
+    {tipo:'2 puestos'},
+    {tipo:'3 puestos'},
+    {tipo:'4 puestos'},
+    {tipo:'5 puestos'},
+    {tipo:'6 puestos'}
    ]}
 ];
+
+// Sofás — notas sobre el nuevo modelo de precio (referencia, no afecta el código):
+// • Silla de comedor y Butaca siempre cobran la tarifa de "1 puesto", sin importar
+//   lo que el cliente escriba en el campo de puestos (son individuales por diseño).
+// • Sofá Cama NO usa esta tabla — usa el campo Tamaño/Modelo y reutiliza los
+//   precios ya cargados en Colchones (misma llave "colchones||Cama · <tamaño>").
+// • Más de 6 puestos cae a manual (no hay tarifa configurada a propósito).
 
 // Cache: "svcKey||tipoKey" -> {id, precio}
 var preciosCache = {};
@@ -2395,6 +2433,108 @@ async function cargarTodosPrecios(){
   } catch(e){
     document.getElementById('preciosTablaCompleta').innerHTML='<div class="empty-state">⚠️ Error: '+e.message+'</div>';
   }
+}
+
+// Arma la descripción de un ítem en el orden exacto que definió Ani para cada
+// servicio (Cantidad no va aquí — se muestra aparte, como columna/badge propia).
+// Si un campo no aplica a ese ítem, simplemente se salta sin dejar hueco.
+// Siempre muestra "N puesto" (singular) o "N puestos" (plural) — sin importar
+// si el cliente escribió "4", "4 puestos", o "puestos: 4". Si no se puede leer
+// ningún número, se muestra el texto tal cual se escribió (para no perder el dato).
+function formatearPuestos(texto){
+  if(!texto) return '';
+  var m = texto.match(/(\d+(?:\s*\+\s*\d+)*)\s*puestos?/i) || texto.match(/^\s*(\d+)\s*$/);
+  if(!m) return texto;
+  var partes = m[1].split('+');
+  var total = 0;
+  for(var i=0;i<partes.length;i++){
+    var n = parseInt(partes[i].trim());
+    if(isNaN(n)) return texto;
+    total += n;
+  }
+  return total===1 ? '1 puesto' : total+' puestos';
+}
+
+function construirDescOrdenada(svcKey, item){
+  var partes = [];
+  function add(v){ if(v!==undefined && v!==null && v!=='') partes.push(v); }
+  var motivosTxt = (item.motivos && item.motivos.length) ? item.motivos.join(', ') : '';
+  var medida = item.medidas || item.sup || (item.area?item.area+' m²':'') || '';
+
+  if(svcKey==='alfombras'){
+    // Tipo, Clasificación, Forma, Medida, Ubicación, Estado Actual, Nivel
+    add(item.tipo);
+    add(item.clasificacion);
+    add(item.forma && item.forma!=='—' ? item.forma : '');
+    add(medida);
+    add(item.ubicacion ? '📍 '+item.ubicacion : '');
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+  } else if(svcKey==='persianas'){
+    // Tipo, Medidas, Ubicación, Estado Actual, Nivel
+    add(item.tipo);
+    add(medida);
+    add(item.ubicacion ? '📍 '+item.ubicacion : '');
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+    add(item.telColor ? '🎨 '+item.telColor : ''); // no estaba en la lista de Ani, se deja al final para no perder el dato
+  } else if(svcKey==='colchones'){
+    // Tipo, Tamaño/Modelo, Estado Actual, Nivel
+    add(item.tipo);
+    add(item.tammod);
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+  } else if(svcKey==='sofas'){
+    // Tipo, Cantidad de Puestos (o Tamaño/Modelo si es Sofá Cama), Estado Actual, Nivel
+    add(item.tipo);
+    add(item.otroText); // texto libre cuando el Tipo es "Otros"
+    add(item.tammod || formatearPuestos(item.puestos));
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+  } else if(svcKey==='pisos' || svcKey==='pulido'){
+    // Tipo, Área Aproximada, Estado Actual, Nivel
+    add(item.tipo);
+    add(medida);
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+  } else if(svcKey==='electro'){
+    var esRotativa = (item.tipo||'').toLowerCase().indexOf('rotativa')>-1;
+    if(esRotativa){
+      // Rotativa: Tipo, Área Aproximada (sin Cantidad, sin motivos/nivel — no aplican)
+      add(item.tipo);
+      add(medida);
+    } else {
+      // Los demás: Tipo, Estado Actual, Nivel (Cantidad va aparte, como badge)
+      add(item.tipo);
+      add(motivosTxt);
+      add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+    }
+  } else if(svcKey==='comercial' || svcKey==='hogar'){
+    // Comercial/Hogar: Tipo, Tipo de Limpieza, Área, Áreas especificadas
+    add(item.tipo);
+    add(item.lt ? (item.lt==='profunda'?'Limpieza Profunda':'Limpieza Recurrente') : '');
+    add(medida);
+    add(item.areas ? 'Áreas: '+item.areas : '');
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+  } else {
+    // Cualquier otro caso: el orden genérico de siempre, para no perder nada
+    add(item.tipo);
+    add(item.lt ? (item.lt==='profunda'?'Limpieza Profunda':'Limpieza Recurrente') : '');
+    add(item.forma && item.forma!=='—' ? item.forma : '');
+    add(item.clasificacion);
+    add(item.tammod);
+    add(item.puestos);
+    add(item.ubicacion ? '📍 '+item.ubicacion : '');
+    add(item.telColor ? '🎨 '+item.telColor : '');
+    add(medida);
+    add(item.areas ? 'Áreas: '+item.areas : '');
+    add(item.otroText);
+    add(item.otroText);
+    add(motivosTxt);
+    add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
+  }
+  return partes.join(' | ');
 }
 
 function tipoKey(row){

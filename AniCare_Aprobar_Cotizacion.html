@@ -51,7 +51,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 
 <div class="card">
   <div class="header">
-    <h1>🌟 AniCare Cleaning Service</h1>
+    <h1>🌟 Cleaning Service & Ani Care</h1>
     <p>Confirmación de Cotización</p>
   </div>
   <div class="body" id="bodyContent">
@@ -187,7 +187,7 @@ function renderQuote(){
   h += '<button class="btn-confirmar-cancel" onclick="confirmarCancelar()">Confirmar</button>';
   h += '</div>';
 
-  h += '<div class="footer-note">AniCare Cleaning Service · Panamá<br>WhatsApp: +507 6317-1227</div>';
+  h += '<div class="footer-note">Cleaning Service & Ani Care · Panamá<br>WhatsApp: +507 6317-1227</div>';
 
   document.getElementById('bodyContent').innerHTML = h;
 }
@@ -270,14 +270,14 @@ function mostrarResultado(aprobado){
       '<div class="result-icon ok">✓</div>'+
       '<div class="result-title">¡Gracias por confiar en nosotros!</div>'+
       '<div class="result-msg">Hemos recibido tu aprobación para la cotización N° '+esc(quoteData.numero_cot)+'.<br><br>Nos pondremos en contacto contigo pronto para coordinar la fecha del servicio.</div>'+
-      '<div class="footer-note">AniCare Cleaning Service · Panamá<br>WhatsApp: +507 6317-1227</div>'+
+      '<div class="footer-note">Cleaning Service & Ani Care · Panamá<br>WhatsApp: +507 6317-1227</div>'+
       '</div>';
   } else {
     body.innerHTML = '<div class="result-screen">'+
       '<div class="result-icon cancel">✕</div>'+
       '<div class="result-title">Entendido, gracias por avisarnos</div>'+
       '<div class="result-msg">Hemos registrado tu respuesta para la cotización N° '+esc(quoteData.numero_cot)+'.<br><br>Si cambias de opinión, contáctanos cuando gustes.</div>'+
-      '<div class="footer-note">AniCare Cleaning Service · Panamá<br>WhatsApp: +507 6317-1227</div>'+
+      '<div class="footer-note">Cleaning Service & Ani Care · Panamá<br>WhatsApp: +507 6317-1227</div>'+
       '</div>';
   }
 }
