@@ -1708,11 +1708,12 @@ function renderCard(s){
         h+='<div class="row2" style="grid-template-columns:120px 1fr">';
         h+='<div class="field"><label class="lbl">'+(l==='en'?'Quantity':'Cantidad')+'</label>';
         h+='<input type="number" id="f-cant-'+s+'" value="1" min="1"></div>';
-        h+='<div class="field"><label class="lbl">'+(l==='en'?'No. of seats':'Cant. de puestos')+'</label>';
+        h+='<div class="field" id="puestos-wrap-'+s+'" style="grid-column:2;grid-row:1"><label class="lbl">'+(l==='en'?'No. of seats':'Cant. de puestos')+'</label>';
         h+='<input type="text" id="f-puestos-'+s+'" onblur="checkPuestosMismatch(\''+s+'\')" placeholder="'+(l==='en'?'e.g. 4 seats':'Ej: 4 puestos')+'"></div>';
-        h+='</div>';
-        // Sofá Cama se cobra por tamaño (igual que Colchones), no por puestos
-        h+='<div class="field" id="tammod-sofacama-'+s+'" style="display:none;margin-top:8px"><label class="lbl">Tamaño / Modelo</label>';
+        // Sofá Cama se cobra por tamaño (igual que Colchones), no por puestos — en
+        // la MISMA fila que Cantidad (columna 2, superpuesta con Cant. de puestos,
+        // se alternan con display none/block) para no desperdiciar espacio vertical.
+        h+='<div class="field" id="tammod-sofacama-'+s+'" style="grid-column:2;grid-row:1;display:none"><label class="lbl">Tamaño / Modelo</label>';
         h+='<select id="f-tammod-'+s+'"><option value="">— Seleccione —</option>';
         h+='<option>Twin Individual (90 cm x 190 cm)</option>';
         h+='<option>Twin XL (99 cm x 203 cm)</option>';
@@ -1722,6 +1723,7 @@ function renderCard(s){
         h+='<option>King Size (190 cm x 200 cm)</option>';
         h+='<option>California King (183 cm x 213 cm)</option>';
         h+='</select></div>';
+        h+='</div>'; // /row2 (Cantidad + Puestos/Tamaño superpuestos)
       } else if(d.hasEspecifMedidas){
         // Persianas: Cantidad + Medidas (select estándar, aprobado por Ani)
         h+='<div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:end;margin-bottom:12px">';
@@ -3066,6 +3068,7 @@ function construirHTMLPDF(d, numCot, fecha){
   if(d.dir) h+='<div class="client-item"><b>Dirección:</b> '+escHtml(d.dir)+'</div>';
   if(d.email) h+='<div class="client-item"><b>Correo:</b> '+escHtml(d.email)+'</div>';
   if(d.correg) h+='<div class="client-item"><b>Corregimiento:</b> '+escHtml(d.correg)+'</div>';
+  if(d.fecha) h+='<div class="client-item" style="grid-column:1/-1"><b>Fecha del servicio:</b> '+escHtml(formatearFechaDDMM(d.fecha))+'</div>';
   if(d.ruc) h+='<div class="client-item"><b>RUC:</b> '+escHtml(d.ruc)+'</div>';
   if(d.rec) h+='<div class="client-item"><b>⭐ Cliente Recurrente</b></div>';
   h+='</div>';
@@ -3076,10 +3079,8 @@ function construirHTMLPDF(d, numCot, fecha){
   // ── Observaciones ──
   if(d.obs&&d.obs.trim()) h+='<div class="obs-box"><div class="t">Observaciones del Cliente</div>'+escHtml(d.obs)+'</div>';
 
-  // ── Servicios Solicitados + Fecha ──
-  h+='<div class="svc-title-row"><span class="t1">Servicios Solicitados</span>';
-  if(d.fecha) h+='<span class="t2"><b>Fecha del servicio:</b> '+escHtml(formatearFechaDDMM(d.fecha))+'</span>';
-  h+='</div>';
+  // ── Servicios Solicitados (la Fecha ya se muestra arriba, en Datos del Cliente) ──
+  h+='<div class="svc-title-row"><span class="t1">Servicios Solicitados</span></div>';
 
   if(d.svcs&&d.svcs.length){
     for(var i=0;i<d.svcs.length;i++){
@@ -3354,8 +3355,7 @@ function checkSofaCama(s){
   var esSofaCama=!!(tipoEl && tipoEl.value==='Sofá Cama');
   var tamDiv=document.getElementById('tammod-sofacama-'+s);
   if(tamDiv) tamDiv.style.display=esSofaCama?'block':'none';
-  var puestosEl=document.getElementById('f-puestos-'+s);
-  var puestosWrap=puestosEl?puestosEl.closest('.field'):null;
+  var puestosWrap=document.getElementById('puestos-wrap-'+s);
   if(puestosWrap) puestosWrap.style.display=esSofaCama?'none':'';
 }
 // Check Otra Medida (alfombras)
