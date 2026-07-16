@@ -2232,6 +2232,13 @@ async function enviarLinkAprobacion(id){
   if(tel.length===8) tel = '507'+tel; // agrega código de país si falta
   window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank');
 
+  // BUG CORREGIDO: este botón ("Enviar al Cliente", el recomendado para cotizaciones
+  // ya cotizadas) solo abría WhatsApp -- nunca mandaba el correo con el link de
+  // aprobación. guardarYEnviarCotizacion() sí lo hacía, pero ese botón es para el
+  // estado "pendiente" (antes de poner precio), un paso distinto. Ahora ambos
+  // botones mandan por los 2 canales, como corresponde.
+  if(q.cliente_email) await enviarCorreoCotizacion(q);
+
   try{
     var s=getSupa();
     if(q.aprobacion_pendiente){
