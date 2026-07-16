@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.google.com/recaptcha/api.js?render=6LfAkE4tAAAAAB1_UlzXxnO2SOHLY7gcD7ej9TZQ"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>AniCare — Solicitud de Cotización</title>
 <style>
@@ -659,45 +660,81 @@ async function getNumCotPreview(){
   return 'AC-'+año+'-####';
 }
 
-// Guarda la cotización completa en Supabase
+// Sitio key de reCAPTCHA v3 (llave pública, no es sensible mostrarla en el código)
+var RECAPTCHA_SITE_KEY = '6LfAkE4tAAAAAB1_UlzXxnO2SOHLY7gcD7ej9TZQ';
+var _ultimoErrorGuardado = null; // mensaje amigable del último rechazo (límite o captcha)
+
+// Obtiene un token de reCAPTCHA v3 para esta acción. Si el script de Google no
+// cargó (bloqueador de anuncios, red lenta, etc.), devuelve null en vez de
+// trabar el formulario — la Edge Function decide qué hacer si falta el token.
+function obtenerTokenCaptcha(){
+  return new Promise(function(resolve){
+    if(typeof grecaptcha === 'undefined' || !grecaptcha.ready){ resolve(null); return; }
+    try{
+      grecaptcha.ready(function(){
+        grecaptcha.execute(RECAPTCHA_SITE_KEY, {action:'crear_cotizacion'})
+          .then(resolve)
+          .catch(function(){ resolve(null); });
+      });
+    } catch(e){ resolve(null); }
+  });
+}
+
+// Guarda la cotización completa en Supabase, pasando primero por la Edge
+// Function crear-cotizacion-protegida (verifica reCAPTCHA + límite de envíos
+// por IP antes de crear el registro — ver bitácora del 16 de julio de 2026).
 async function guardarEnSupabase(numCot, d){
+  _ultimoErrorGuardado = null;
   try{
-    var sb = getSupa();
     var año = new Date().getFullYear();
     var consec = parseInt(numCot.replace('*','').split('-')[2]) || 0;
 
     // Convertir svcs (array de strings) a array de objetos con svc key
     var serviciosObj = construirServiciosObj(d);
+    var captchaToken = await obtenerTokenCaptcha();
 
-    // Se usa una función SECURITY DEFINER (no insert directo a la tabla) porque el
-    // formulario público (rol anon) ya no tiene permiso de LEER cotizaciones —
-    // solo de crearlas a través de esta función controlada.
-    var {data, error} = await sb.rpc('crear_cotizacion_publica', {
-      p_numero_cot: numCot,
-      p_año: año,
-      p_consecutivo: consec,
-      p_cliente_nombre: d.nombre,
-      p_cliente_tipo: d.tipo,
-      p_cliente_telefono: d.tel,
-      p_cliente_email: d.email,
-      p_cliente_direccion: d.dir,
-      p_cliente_corregimiento: d.correg,
-      p_cliente_recurrente: d.rec,
-      p_cliente_nuevo: d.nuevo,
-      p_cliente_empresa: d.empresa,
-      p_cliente_ruc: d.ruc,
-      p_cliente_ph: d.ph,
-      p_fecha_servicio: d.fecha || null,
-      p_servicios: serviciosObj,
-      p_metodo_pago: d.pagos.join(', '),
-      p_observaciones: d.obs
+    var resp = await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/crear-cotizacion-protegida', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYWpjdnNnbnh4bm1odWJyeG1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3Njg5MzksImV4cCI6MjA5ODM0NDkzOX0.wArWbLtcrwgKHvq2vdDqycqOGcti8-kaFngzw9XTX2M'
+      },
+      body: JSON.stringify({
+        captchaToken: captchaToken,
+        p_numero_cot: numCot,
+        p_año: año,
+        p_consecutivo: consec,
+        p_cliente_nombre: d.nombre,
+        p_cliente_tipo: d.tipo,
+        p_cliente_telefono: d.tel,
+        p_cliente_email: d.email,
+        p_cliente_direccion: d.dir,
+        p_cliente_corregimiento: d.correg,
+        p_cliente_recurrente: d.rec,
+        p_cliente_nuevo: d.nuevo,
+        p_cliente_empresa: d.empresa,
+        p_cliente_ruc: d.ruc,
+        p_cliente_ph: d.ph,
+        p_fecha_servicio: d.fecha || null,
+        p_servicios: serviciosObj,
+        p_metodo_pago: d.pagos.join(', '),
+        p_observaciones: d.obs
+      })
     });
-    if(error) throw error;
+
+    var resultado = await resp.json().catch(function(){ return {}; });
+
+    if(!resp.ok){
+      _ultimoErrorGuardado = resultado.mensaje || null;
+      throw new Error(resultado.mensaje || 'No se pudo registrar la cotización.');
+    }
+
     console.log('✅ Cotización guardada en Supabase:', numCot);
 
-    // Llamar automáticamente a calcular-precios (data = id devuelto por la función)
-    if(data){
-      calcularPreciosAuto(data).catch(function(e){
+    // Llamar automáticamente a calcular-precios (resultado.id = id devuelto por la función)
+    if(resultado.id){
+      calcularPreciosAuto(resultado.id).catch(function(e){
         console.warn('calcular-precios no completado:', e);
       });
     }
@@ -2749,7 +2786,9 @@ async function obtenerNumSesion(d){
   if(!ok){
     // No dejar avanzar el flujo (email/WhatsApp) si el guardado en Supabase falló.
     // Tampoco se fija _numCotSesion, así un reintento vuelve a intentar guardar de cero.
-    throw new Error('No se pudo registrar la cotización en el sistema. Por favor intenta de nuevo.');
+    // Si el rechazo fue por límite de envíos o CAPTCHA, usamos el mensaje específico
+    // que devolvió la Edge Function en vez del genérico.
+    throw new Error(_ultimoErrorGuardado || 'No se pudo registrar la cotización en el sistema. Por favor intenta de nuevo.');
   }
   _numCotSesion = numTmp;
   return _numCotSesion;
@@ -2783,7 +2822,7 @@ async function crearCotizacion(){
     _numCotParaEnvio=numCot;
     mostrarModalEnvio();
   } catch(e){
-    aniModal({tipo:'err',titulo:'Error al crear la cotización',msg:'Ocurrió un problema. Intenta de nuevo o contáctanos por WhatsApp: +507 6317-1227',btnTxt:'✓ Entendido'});
+    aniModal({tipo:'err',titulo:'Error al crear la cotización',msg:(e&&e.message)||'Ocurrió un problema. Intenta de nuevo o contáctanos por WhatsApp: +507 6317-1227',btnTxt:'✓ Entendido'});
     console.error(e);
   } finally{
     _enviando=false;
