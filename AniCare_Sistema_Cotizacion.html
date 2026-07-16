@@ -2942,6 +2942,9 @@ async function enviarEmailCliente(numCot,d){
           telefono:d.tel,
           email:d.email||'',
         },
+        // Resumen de servicios agregado al correo de "solicitud recibida" (antes
+        // no se mandaba nada aquí, aunque el mismo dato ya se le mandaba a Ani).
+        servicios:d.svcs.join('\n\n'),
         fecha:d.fecha||''
       })
     });

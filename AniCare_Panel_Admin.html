@@ -6,6 +6,7 @@
 <title>AniCare — Panel de Administrador</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh;color:#2d3748}
@@ -300,6 +301,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
   <div class="tabs">
     <button class="tab-btn active" id="tabCot" onclick="cambiarTab('cotizaciones')">📋 Cotizaciones</button>
     <button class="tab-btn" id="tabPrecios" onclick="cambiarTab('precios')">💲 Gestión de Precios</button>
+    <button class="tab-btn" id="tabRecibos" onclick="abrirModalRecibos()">🧾 Recibos de Pago</button>
     <button class="tab-btn" id="tabDirectorio" onclick="cambiarTab('directorio')">📇 Directorio</button>
     <button class="tab-btn" id="tabIndicaciones" onclick="cambiarTab('indicaciones')">📖 Indicaciones</button>
   </div>
@@ -406,6 +408,41 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
     <div class="modal-btns">
       <button class="btn-modal-cancelar" onclick="cerrarModalCancelar()">Cancelar</button>
       <button class="btn-modal-confirmar" onclick="confirmarCancelacion()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalRecibos">
+  <div class="modal-box">
+    <h3>🧾 Recibos de Pago — Exportar a Excel</h3>
+    <label style="display:block;font-size:12px;font-weight:700;color:#2D6A4F;margin-bottom:4px">Desde</label>
+    <input type="date" id="recibosFechaInicio" style="width:100%;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;margin-bottom:12px">
+    <label style="display:block;font-size:12px;font-weight:700;color:#2D6A4F;margin-bottom:4px">Hasta</label>
+    <input type="date" id="recibosFechaFin" style="width:100%;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;margin-bottom:6px">
+    <p style="font-size:11px;color:#94A3B8;margin-bottom:10px">Se incluyen todas las cotizaciones marcadas como Pagadas dentro de este rango (por fecha de pago).</p>
+    <div class="modal-btns">
+      <button class="btn-modal-cancelar" onclick="cerrarModalRecibos()">Cancelar</button>
+      <button class="btn-modal-confirmar" onclick="confirmarExportarRecibos()">Generar Excel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalMetodoPago">
+  <div class="modal-box">
+    <h3>💰 ¿Cómo pagó el cliente?</h3>
+    <select id="metodoPagoSelect" onchange="toggleMetodoPagoOtro()">
+      <option value="">— Selecciona un método —</option>
+      <option value="Yappy">Yappy</option>
+      <option value="Transferencia Banco General">Transferencia Banco General</option>
+      <option value="Transferencia Davivienda">Transferencia Davivienda</option>
+      <option value="Efectivo">Efectivo</option>
+      <option value="Tarjeta">Tarjeta</option>
+      <option value="Otro">Otro (especificar)</option>
+    </select>
+    <textarea id="metodoPagoOtro" placeholder="Especifique el método..." style="display:none"></textarea>
+    <div class="modal-btns">
+      <button class="btn-modal-cancelar" onclick="cerrarModalMetodoPago()">Cancelar</button>
+      <button class="btn-modal-confirmar" onclick="confirmarMetodoPago()">Confirmar Pago</button>
     </div>
   </div>
 </div>
@@ -1330,6 +1367,183 @@ async function marcarAprobada(id){
   } catch(e){ toast('❌ Error: '+e.message); }
 }
 
+function abrirModalRecibos(){
+  var hoy=new Date();
+  var inicioMes=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+  document.getElementById('recibosFechaInicio').value=inicioMes.toISOString().slice(0,10);
+  document.getElementById('recibosFechaFin').value=hoy.toISOString().slice(0,10);
+  document.getElementById('modalRecibos').classList.add('show');
+}
+function cerrarModalRecibos(){
+  document.getElementById('modalRecibos').classList.remove('show');
+}
+function confirmarExportarRecibos(){
+  var ini=document.getElementById('recibosFechaInicio').value;
+  var fin=document.getElementById('recibosFechaFin').value;
+  if(!ini||!fin){ toast('⚠️ Selecciona ambas fechas'); return; }
+  if(ini>fin){ toast('⚠️ La fecha "Desde" no puede ser posterior a "Hasta"'); return; }
+  cerrarModalRecibos();
+  generarExcelRecibosPago(ini,fin);
+}
+
+// Genera el Excel de Recibos de Pago con el diseño exacto aprobado por Ani:
+// azul marino + acento dorado, logo, filas alternadas, y fila de TOTAL con
+// fórmulas reales (no valores fijos), usando ExcelJS (SheetJS gratuito no
+// permite este nivel de estilo — ver nota en la Bitácora).
+async function generarExcelRecibosPago(fechaInicioStr,fechaFinStr){
+  if(typeof ExcelJS==='undefined'){ toast('❌ Librería ExcelJS no cargó. Revisa tu conexión a internet.'); return; }
+
+  var fechaInicio=new Date(fechaInicioStr+'T00:00:00');
+  var fechaFin=new Date(fechaFinStr+'T23:59:59');
+
+  var pagadas=todasCotizaciones.filter(function(q){
+    if(q.estado!=='pagada'||!q.fecha_pagada) return false;
+    var fp=new Date(q.fecha_pagada);
+    return fp>=fechaInicio && fp<=fechaFin;
+  }).sort(function(a,b){ return new Date(a.fecha_pagada)-new Date(b.fecha_pagada); });
+
+  if(pagadas.length===0){ toast('⚠️ No hay cotizaciones pagadas en ese rango de fechas'); return; }
+
+  toast('🧾 Generando Excel...');
+
+  var AZUL_OSCURO='FF0B1F3A', DORADO='FFC9A961', AZUL_TOTAL='FF16325C', GRIS_FILA='FFF7F8FA', BLANCO='FFFFFFFF';
+
+  var wb=new ExcelJS.Workbook();
+  var ws=wb.addWorksheet('Recibos de Pago');
+  ws.views=[{showGridLines:false}];
+
+  for(var row=1;row<=4;row++){
+    for(var col=1;col<=12;col++){
+      ws.getCell(row,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_OSCURO}};
+    }
+    ws.getRow(row).height=22;
+  }
+
+  var logoBase64=LOGO_BASE64.split(',')[1];
+  var imgId=wb.addImage({base64:logoBase64,extension:'png'});
+  ws.addImage(imgId,{tl:{col:0,row:0},ext:{width:178,height:82}});
+
+  ws.mergeCells('C1:M2');
+  var tituloCell=ws.getCell('C1');
+  tituloCell.value='Cleaning Service & Ani Care — Reporte de Recibos de Pago';
+  tituloCell.font={name:'Arial',size:15,bold:true,color:{argb:BLANCO}};
+  tituloCell.alignment={horizontal:'left',vertical:'middle',indent:1};
+
+  ws.mergeCells('C4:M4');
+  var subCell=ws.getCell('C4');
+  var fechaGenerada=new Date().toLocaleDateString('es-PA',{day:'2-digit',month:'2-digit',year:'numeric'});
+  subCell.value='Período: '+formatearFechaDDMM(fechaInicioStr)+' al '+formatearFechaDDMM(fechaFinStr)+'   |   RUC: E-8-150284 DV 05   |   Generado: '+fechaGenerada;
+  subCell.font={name:'Arial',size:9.5,italic:true,color:{argb:'FF9CAECF'}};
+  subCell.alignment={horizontal:'left',vertical:'middle',indent:1};
+
+  for(var col=1;col<=12;col++){
+    ws.getCell(5,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:DORADO}};
+  }
+  ws.getRow(5).height=4;
+
+  var headers=['Fecha de Pago','N° Recibo','N° Cotización','Cliente','Tipo','RUC/Cédula','Servicios','Subtotal','Descuento','ITBMS','Total Pagado','Método de Pago'];
+  var headerRow=6;
+  headers.forEach(function(h,i){
+    var c=ws.getCell(headerRow,i+1);
+    c.value=h;
+    c.font={name:'Arial',size:10,bold:true,color:{argb:BLANCO}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_OSCURO}};
+    c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+    c.border={bottom:{style:'medium',color:{argb:DORADO}}};
+  });
+  ws.getRow(headerRow).height=32;
+
+  var r=headerRow+1;
+  pagadas.forEach(function(q){
+    var fechaPagoStr=new Date(q.fecha_pagada).toLocaleDateString('es-PA',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
+    var svcNames=(q.servicios||[]).map(function(it){
+      var svcKey=it.svc||'';
+      return (TIPOS_MAP[svcKey]&&TIPOS_MAP[svcKey].nombre)||svcKey;
+    });
+    var svcUnicos=svcNames.filter(function(v,i){return svcNames.indexOf(v)===i;});
+    var rowVals=[
+      fechaPagoStr,
+      'REC-'+(q.numero_cot||''),
+      q.numero_cot||'',
+      nombreCliente(q),
+      q.cliente_tipo==='empresarial'?'Comercial':'Residencial',
+      q.cliente_ruc||'',
+      svcUnicos.join(', '),
+      q.subtotal||0,
+      q.descuento||0,
+      q.itbms||0,
+      q.total||0,
+      q.metodo_pago||''
+    ];
+    rowVals.forEach(function(val,i){
+      var c=ws.getCell(r,i+1);
+      c.value=val;
+      c.font={name:'Arial',size:10,color:{argb:'FF2D3748'}};
+      if(i===7||i===8||i===9||i===10){
+        c.alignment={horizontal:'right',vertical:'middle'};
+        c.numFmt='$#,##0.00';
+      } else if(i===3||i===5||i===6){
+        c.alignment={horizontal:'left',vertical:'middle',wrapText:true};
+      } else {
+        c.alignment={horizontal:'center',vertical:'middle'};
+      }
+      c.border={bottom:{style:'thin',color:{argb:'FFE2E8F0'}}};
+    });
+    ws.getRow(r).height=28;
+    if((r-headerRow)%2===0){
+      for(var col=1;col<=12;col++){
+        ws.getCell(r,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:GRIS_FILA}};
+      }
+    }
+    r++;
+  });
+
+  var totalRow=r;
+  var firstDataRow=headerRow+1;
+  var lastDataRow=r-1;
+  ws.mergeCells(totalRow,1,totalRow,7);
+  var totalLbl=ws.getCell(totalRow,1);
+  totalLbl.value='TOTAL DEL PERÍODO';
+  totalLbl.font={name:'Arial',size:11,bold:true,color:{argb:BLANCO}};
+  totalLbl.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_TOTAL}};
+  totalLbl.alignment={horizontal:'right',vertical:'middle',indent:1};
+
+  [8,9,10,11].forEach(function(col){
+    var colLetter=String.fromCharCode(64+col);
+    var c=ws.getCell(totalRow,col);
+    c.value={formula:'SUM('+colLetter+firstDataRow+':'+colLetter+lastDataRow+')'};
+    c.font={name:'Arial',size:11,bold:true,color:{argb:BLANCO}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_TOTAL}};
+    c.numFmt='$#,##0.00';
+    c.alignment={horizontal:'right',vertical:'middle'};
+  });
+  ws.getCell(totalRow,12).fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_TOTAL}};
+  ws.getRow(totalRow).height=26;
+
+  var widths=[14,16,15,20,12,15,32,12,11,10,13,24];
+  widths.forEach(function(w,i){ ws.getColumn(i+1).width=w; });
+
+  var notaRow=totalRow+2;
+  ws.mergeCells(notaRow,1,notaRow,12);
+  var notaCell=ws.getCell(notaRow,1);
+  notaCell.value='Nota: Este reporte es un comprobante interno de pagos recibidos, no constituye Factura Fiscal Electrónica.';
+  notaCell.font={name:'Arial',size:8,italic:true,color:{argb:'FF94A3B8'}};
+
+  ws.views=[{showGridLines:false,state:'frozen',ySplit:headerRow}];
+
+  var buffer=await wb.xlsx.writeBuffer();
+  var blob=new Blob([buffer],{type:'application/octet-stream'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='Recibos_de_Pago_'+fechaInicioStr+'_a_'+fechaFinStr+'.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✅ Excel generado — '+pagadas.length+' recibo(s) incluido(s)');
+}
+
 async function eliminarCotizacionPendiente(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return;
@@ -1345,16 +1559,45 @@ async function eliminarCotizacionPendiente(id){
   } catch(e){ toast('❌ Error al eliminar: '+e.message); }
 }
 
-async function marcarPagada(id){
+var pagandoId=null;
+function marcarPagada(id){
+  pagandoId=id;
+  document.getElementById('metodoPagoSelect').value='';
+  document.getElementById('metodoPagoOtro').value='';
+  document.getElementById('metodoPagoOtro').style.display='none';
+  document.getElementById('modalMetodoPago').classList.add('show');
+}
+function cerrarModalMetodoPago(){
+  document.getElementById('modalMetodoPago').classList.remove('show');
+  pagandoId=null;
+}
+function toggleMetodoPagoOtro(){
+  var sel=document.getElementById('metodoPagoSelect').value;
+  document.getElementById('metodoPagoOtro').style.display=sel==='Otro'?'block':'none';
+}
+async function confirmarMetodoPago(){
+  if(!pagandoId) return;
+  var sel=document.getElementById('metodoPagoSelect').value;
+  if(!sel){ toast('⚠️ Selecciona el método de pago'); return; }
+  var metodo=sel==='Otro'?(document.getElementById('metodoPagoOtro').value.trim()||'Otro'):sel;
+  var id=pagandoId;
+  document.getElementById('modalMetodoPago').classList.remove('show');
+  pagandoId=null;
   try{
     var s=getSupa();
-    var {error}=await s.from('cotizaciones').update({estado:'pagada',fecha_pagada:new Date().toISOString()}).eq('id',id);
+    var {error}=await s.from('cotizaciones').update({estado:'pagada',fecha_pagada:new Date().toISOString(),metodo_pago:metodo}).eq('id',id);
     if(error) throw error;
     var q=todasCotizaciones.find(function(x){return x.id===id;});
-    if(q){ q.estado='pagada'; q.fecha_pagada=new Date().toISOString(); }
-    toast('💰 Cotización marcada como Pagada');
+    if(q){ q.estado='pagada'; q.fecha_pagada=new Date().toISOString(); q.metodo_pago=metodo; }
+    toast('💰 Cotización marcada como Pagada — generando recibo...');
     renderCotizaciones();
-    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id);} },100);
+    setTimeout(function(){
+      var card=document.getElementById('qcard-'+id);
+      if(card){card.classList.add('open'); renderQuoteDetail(id);}
+      // El recibo se genera leyendo los precios ya en pantalla — se espera un
+      // instante extra a que renderQuoteDetail termine de dibujar los inputs.
+      setTimeout(function(){ generarReciboPago(id); },300);
+    },100);
   } catch(e){ toast('❌ Error: '+e.message); }
 }
 
@@ -1884,8 +2127,8 @@ function renderQuoteDetail(id){
       h+='</div>';
     } else if(q.estado==='pagada'){
       h+='<div class="btn-row">';
-      h+='<button class="btn-pdf" onclick="generarCotizacionPDF('+id+')">📄 PDF Factura</button>';
-      h+='<button class="btn-estado btn-wa-inline" onclick="enviarFactura('+id+')">📤 Enviar Factura</button>';
+      h+='<button class="btn-pdf" onclick="generarReciboPago('+id+')">📄 Recibo de Pago</button>';
+      h+='<button class="btn-estado btn-wa-inline" onclick="enviarFactura('+id+')">📤 Enviar Recibo</button>';
       h+='</div>';
     }
     // Cancelada: sin botones — pantalla de solo lectura (ver punto 6)
@@ -1946,15 +2189,15 @@ function enviarFactura(id){
   if(!q) return;
   var msg = '🌟 *Cleaning Service & Ani Care*\n\n';
   msg += 'Hola '+nombreCliente(q)+' 👋\n\n';
-  msg += '¡Gracias por tu pago! Tu factura de la cotización N° *'+q.numero_cot+'* ha sido procesada:\n';
+  msg += '¡Gracias por tu pago! Tu recibo de pago de la cotización N° *'+q.numero_cot+'* ha sido procesado:\n';
   msg += '💰 Total pagado: *$'+(q.total||0).toFixed(2)+'*'+(q.aplica_itbms?' (ITBMS incluido)':'')+'\n\n';
-  msg += '📄 Te adjuntamos el PDF de tu factura por este medio.\n\n';
-  msg += 'Ha sido un placer atenderte. ¡Gracias por confiar en AniCare! 🧹✨';
+  msg += '📄 Te adjuntamos el PDF de tu recibo por este medio.\n\n';
+  msg += 'Ha sido un placer atenderte. ¡Gracias por confiar en Cleaning Service & Ani Care! 🧹✨';
 
   var tel = (q.cliente_telefono||'').replace(/\D/g,'');
   if(tel.length===8) tel = '507'+tel;
   window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg),'_blank');
-  toast('📤 WhatsApp abierto — recuerda adjuntar el PDF de la factura');
+  toast('📤 WhatsApp abierto — recuerda adjuntar el PDF del recibo');
 }
 
 async function enviarLinkAprobacion(id){
@@ -2015,13 +2258,21 @@ async function guardarYEnviarCotizacion(id){
   }
 }
 
-// Envía la cotización por correo usando Formspree (mismo formulario que usa el cliente)
+// Envía la cotización por correo — llama a la Edge Function enviar-email
 async function enviarCorreoCotizacion(q){
   var linkAprobacion = q.token_aprobacion ? (GITHUB_BASE_URL+'AniCare_Aprobar_Cotizacion.html?t='+q.token_aprobacion) : '';
   try{
-    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+    // BUG CORREGIDO: faltaban los headers 'apikey'/'Authorization' que exige la
+    // función — sin ellos la llamada fallaba en silencio (nunca llegaba el correo,
+    // el error solo quedaba en consola). Ahora usa la misma SUPABASE_KEY que ya
+    // usa el resto del panel para todas las llamadas a Supabase.
+    var resp = await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer '+SUPABASE_KEY
+      },
       body:JSON.stringify({
         tipo:'cotizacion_al_cliente',
         numCot:q.numero_cot,
@@ -2033,6 +2284,7 @@ async function enviarCorreoCotizacion(q){
         linkAprobacion:linkAprobacion
       })
     });
+    if(!resp.ok){ console.warn('enviar-email respondió con error:', resp.status, await resp.text()); }
   } catch(e){ console.warn('No se pudo enviar el correo:',e); }
 }
 
@@ -2154,15 +2406,15 @@ function generarCotizacionPDF(id){
   h+='.svc-title-row .t2{font-size:11px;color:#4a5568}';
   h+='.svc-title-row .t2 b{color:#1B2838}';
   h+='.svc-block{margin-bottom:14px}';
-  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:11px;font-weight:800;color:#1B4332;display:flex;align-items:center}';
-  h+='.svc-header .cant-col-lbl{font-size:13px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;width:60px;flex-shrink:0;margin-right:14px}';
+  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:800;color:#1B4332;display:flex;align-items:center}';
+  h+='.svc-header .cant-col-lbl{font-size:12px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;width:88px;flex-shrink:0;margin-right:14px;white-space:nowrap}';
   h+='.svc-header .svc-name-flex{flex:1}';
-  h+='.svc-header .price-col-lbl{font-size:13px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}';
+  h+='.svc-header .price-col-lbl{font-size:12px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;white-space:nowrap}';
   h+='.svc-items{border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px}';
   h+='.svc-item{display:flex;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #F1F5F4}';
   h+='.svc-item:last-child{border-bottom:none}';
-  h+='.badge-num-plain{font-size:13px;font-weight:800;color:#1B4332;width:60px;text-align:left;flex-shrink:0;margin-right:14px}';
-  h+='.badge-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;flex-shrink:0;width:60px;margin-right:14px}';
+  h+='.badge-num-plain{font-size:13px;font-weight:800;color:#1B4332;width:88px;text-align:left;flex-shrink:0;margin-right:14px}';
+  h+='.badge-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;flex-shrink:0;width:88px;margin-right:14px}';
   h+='.badge-wrap .lbl{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}';
   h+='.badge-num{width:22px;height:22px;border-radius:50%;background:#1B4332;color:white;font-size:11px;font-weight:800;text-align:center;line-height:22px;flex-shrink:0}';
   h+='.badge-m2{background:#DBEAFE;color:#1E40AF;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:12px;flex-shrink:0;height:fit-content;white-space:nowrap}';
@@ -2283,6 +2535,190 @@ function generarCotizacionPDF(id){
   h+='<span class="footer-item">'+ICON_MAIL+'cleaningserviceanicare.com</span>';
   h+='<span class="footer-item">'+ICON_PHONE+'+507 6317-1227</span>';
   h+='</div>Gracias por confiar en nosotros.</div>';
+
+  h+='</body></html>';
+
+  var win=window.open('','_blank');
+  if(win){ win.document.write(h); win.document.close(); setTimeout(function(){win.print();},400); }
+}
+
+// ===================== RECIBO DE PAGO =====================
+// Copia del generador de Cotización, con la MISMA configuración visual (a
+// pedido de Ani, para no romper nada del diseño ya confirmado). Diferencias:
+// título "Recibo de Pago", numeración REC-{numero_cot}, sello de pagado,
+// fecha/método de pago, y un aviso claro de que esto NO es una Factura Fiscal
+// Electrónica (en Panamá eso requiere pasar por el SFEP/DGI con CUFE — ver
+// nota en la Bitácora). Esto es solo un comprobante interno de pago.
+function generarReciboPago(id){
+  var q=todasCotizaciones.find(function(x){return x.id===id;});
+  if(!q) return;
+  var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
+  var subtotal=0;
+  rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; });
+  var desc=parseFloat((document.getElementById('descuento-'+id)||{}).value)||0;
+  var baseImponible=Math.max(0,subtotal-desc);
+  var aplicaItbmsEl=document.getElementById('aplicaItbms-'+id);
+  var aplicaItbms=aplicaItbmsEl?aplicaItbmsEl.checked:false;
+  var itbms=aplicaItbms?baseImponible*0.07:0;
+  var total=baseImponible+itbms;
+  var fecha=new Date().toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
+  var fechaPago=q.fecha_pagada?new Date(q.fecha_pagada).toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'}):fecha;
+
+  function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  var ICON_MAIL='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M4 4h16v16H4z"/><path d="M4 6l8 7 8-7"/></svg>';
+  var ICON_PHONE='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>';
+  var ICON_PIN='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+
+  var h='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>';
+  h+='*{box-sizing:border-box;margin:0;padding:0}';
+  h+='body{font-family:Arial,sans-serif;color:#2d3748;background:white;max-width:750px;margin:0 auto}';
+  h+='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}';
+  h+='@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}';
+  h+='.svc-block{break-inside:avoid;page-break-inside:avoid}';
+  h+='.svc-item{break-inside:avoid;page-break-inside:avoid}';
+  h+='.svc-header{break-after:avoid;page-break-after:avoid}';
+  h+='.totals{break-inside:avoid;page-break-inside:avoid}';
+  h+='.garantia{break-inside:avoid;page-break-inside:avoid}';
+  h+='.header{break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid}';
+  h+='.client-grid{break-inside:avoid;page-break-inside:avoid}';
+  h+='.obs-box{break-inside:avoid;page-break-inside:avoid}';
+  h+='.header{background:#4B5563;padding:20px 26px;display:flex;align-items:center}';
+  h+='.header .logo-box{background:white;border-radius:12px;padding:6px;flex-shrink:0;margin-right:16px}';
+  h+='.header .logo-box img{height:44px;width:auto;display:block}';
+  h+='.header .brand{flex:1}';
+  h+='.header .brand h1{color:white;font-size:20px;font-weight:800;margin-bottom:7px}';
+  h+='.header .contact-row{font-size:9.5px;color:rgba(255,255,255,.8)}';
+  h+='.header .contact-item{display:inline-block;margin-right:14px}';
+  h+='.header .qbox{background:white;border-radius:10px;padding:10px 16px;text-align:right;flex-shrink:0}';
+  h+='.header .qbox .lbl{color:#94A3B8;font-size:8px;font-weight:700;letter-spacing:.5px}';
+  h+='.header .qbox .num{color:#16202C;font-size:16px;font-weight:900;margin-top:2px}';
+  h+='.header .qbox .date{color:#94A3B8;font-size:8.5px;margin-top:2px}';
+  h+='.pad{padding:20px 26px}';
+  h+='.sec-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
+  h+='.client-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:8px}';
+  h+='.client-item{font-size:11px;color:#4a5568}';
+  h+='.client-item b{color:#1B2838;font-weight:700}';
+  h+='.pago-row{font-size:11.5px;color:#4a5568;margin-bottom:16px}';
+  h+='.pago-row b{color:#1B2838}';
+  h+='.svc-title-row{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #E2E8F0;padding-bottom:6px;margin-bottom:10px}';
+  h+='.svc-title-row .t1{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1B4332}';
+  h+='.svc-block{margin-bottom:14px}';
+  h+='.svc-header{background:#F1F5F4;padding:7px 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:800;color:#1B4332;display:flex;align-items:center}';
+  h+='.svc-header .cant-col-lbl{font-size:12px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;width:88px;flex-shrink:0;margin-right:14px;white-space:nowrap}';
+  h+='.svc-header .svc-name-flex{flex:1}';
+  h+='.svc-header .price-col-lbl{font-size:12px;font-weight:800;color:#40916C;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;white-space:nowrap}';
+  h+='.svc-items{border:1px solid #E2E8F0;border-top:none;border-radius:0 0 8px 8px}';
+  h+='.svc-item{display:flex;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #F1F5F4}';
+  h+='.svc-item:last-child{border-bottom:none}';
+  h+='.badge-num-plain{font-size:13px;font-weight:800;color:#1B4332;width:88px;text-align:left;flex-shrink:0;margin-right:14px}';
+  h+='.badge-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;flex-shrink:0;width:88px;margin-right:14px}';
+  h+='.badge-wrap .lbl{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}';
+  h+='.badge-m2{background:#DBEAFE;color:#1E40AF;font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:12px;flex-shrink:0;height:fit-content;white-space:nowrap}';
+  h+='.svc-item .desc{font-size:12px;color:#4a5568;line-height:1.5;flex:1;text-align:justify;margin-right:16px}';
+  h+='.svc-item .price{font-size:12px;font-weight:800;color:#1B2838;white-space:nowrap}';
+  h+='.totals{margin-top:16px}';
+  h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 0}';
+  h+='.t-final-box{background:#E9F7EF;border:1.5px solid #2D6A4F;border-radius:10px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}';
+  h+='.t-final-box .lbl{font-size:14px;font-weight:800;color:#1B2838}';
+  h+='.t-final-box .val{font-size:16px;font-weight:900;color:#1B2838}';
+  h+='.garantia{background:#F0FAF4;border:1.5px solid #40916C;border-radius:10px;padding:12px 16px;margin-top:16px;font-size:12px;color:#1B4332;line-height:1.7}';
+  h+='.garantia b{color:#1B4332}';
+  h+='.footer{text-align:center;font-size:10px;color:#718096;margin-top:20px;border-top:1px solid #E2E8F0;padding-top:14px}';
+  h+='.footer-row{margin-bottom:6px}';
+  h+='.footer-item{display:inline-block;margin:0 10px}';
+  h+='</style></head><body>';
+
+  // ── Encabezado — igual al de cotización, pero con sello PAGADO ──
+  h+='<div class="header">';
+  h+='<div class="logo-box"><img src="'+LOGO_BASE64+'" alt="AniCare"></div>';
+  h+='<div class="brand"><h1>Cleaning Service & Ani Care</h1>';
+  h+='<div class="contact-row">';
+  h+='<span class="contact-item" style="color:white">'+ICON_MAIL+'cleaningserviceanicare.com</span>';
+  h+='<span class="contact-item" style="color:white">'+ICON_MAIL+'cleaningserviceani@gmail.com</span>';
+  h+='<span class="contact-item" style="color:white">'+ICON_PHONE+'+507 6317-1227</span>';
+  h+='</div></div>';
+  h+='<div class="qbox"><div class="lbl">RECIBO DE PAGO</div><div class="num">N° REC-'+esc(q.numero_cot)+'</div><div class="date">'+fecha+'</div></div>';
+  h+='</div>';
+
+  h+='<div class="pad">';
+
+  // ── Aviso legal — que quede clarísimo que esto no reemplaza la factura fiscal ──
+  h+='<div style="background:#EFF6FF;border:1.5px solid #2563EB;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:10.5px;color:#1E3A8A;line-height:1.6"><b>ℹ️ Este documento es un comprobante interno de pago</b>, no sustituye la Factura Fiscal Electrónica. Si requiere factura fiscal con validez ante la DGI, por favor solicítela por separado.</div>';
+
+  // ── Datos del cliente ──
+  h+='<div class="sec-title">Datos del Cliente</div>';
+  h+='<div class="client-grid">';
+  h+='<div class="client-item"><b>Nombre:</b> '+esc(nombreCliente(q))+'</div>';
+  if(q.cliente_ph||q.cliente_ruc) h+='<div class="client-item"><b>'+(q.cliente_ruc?'RUC':'PH/Residencial')+':</b> '+esc(q.cliente_ruc||q.cliente_ph)+'</div>';
+  if(q.cliente_telefono) h+='<div class="client-item"><b>Teléfono:</b> '+esc(q.cliente_telefono)+'</div>';
+  if(q.cliente_direccion) h+='<div class="client-item"><b>Dirección:</b> '+esc(q.cliente_direccion)+'</div>';
+  if(q.cliente_email) h+='<div class="client-item"><b>Correo:</b> '+esc(q.cliente_email)+'</div>';
+  if(q.cliente_corregimiento) h+='<div class="client-item"><b>Corregimiento:</b> '+esc(q.cliente_corregimiento)+'</div>';
+  h+='<div class="client-item" style="grid-column:1/-1"><div style="display:inline-flex;align-items:center;gap:6px;background:#E9F7EF;border:1.5px solid #2D6A4F;border-radius:8px;padding:6px 12px;margin-top:2px"><span style="font-size:13px">✅</span><b style="color:#1B4332">Pago recibido el:</b> <span style="font-weight:800;color:#1B2838">'+esc(fechaPago)+'</span>'+(q.metodo_pago?' <span style="color:#4a5568">· '+esc(q.metodo_pago)+'</span>':'')+'</div></div>';
+  h+='</div>';
+
+  // ── Título de servicios (mismo bloque que la cotización) ──
+  h+='<div class="svc-title-row" style="margin-top:14px"><span class="t1">Servicios Pagados</span></div>';
+
+  var gruposPorServicio={};
+  var ordenServicios=[];
+  rows.forEach(function(r){
+    var rowEl=r.closest('.price-row');
+    if(!rowEl) return;
+    var infoEl=rowEl.querySelector('.price-info');
+    var svcKeyRow=r.getAttribute('data-svc')||'';
+    var svcName=(TIPOS_MAP[svcKeyRow]&&TIPOS_MAP[svcKeyRow].nombre)||'Servicio';
+    var descEl=infoEl?infoEl.querySelector('.desc-text'):null;
+    var descHtml=descEl?descEl.innerHTML:'';
+    descHtml=descHtml.replace(/\s*\|\s*Nivel:[^|]*/i,'');
+    descHtml=descHtml.replace(/\s*\|\s*x\d+\s*(?=\|)/i,'');
+    descHtml=descHtml.replace(/^\s*x\d+\s*\|\s*/i,'');
+    var cantCircle=rowEl.querySelector('.badge-cant-circle');
+    var areaPill=rowEl.querySelector('.badge-area-pill');
+    var badgeHtml='';
+    if(cantCircle){
+      badgeHtml='<div class="badge-num-plain">'+esc(cantCircle.textContent.trim())+'</div>';
+    } else if(areaPill){
+      badgeHtml='<div class="badge-wrap"><span class="lbl" style="color:#1E40AF">Área</span><div class="badge-m2">'+esc(areaPill.textContent.trim())+'</div></div>';
+    }
+    if(!gruposPorServicio[svcName]){ gruposPorServicio[svcName]=[]; ordenServicios.push(svcName); }
+    gruposPorServicio[svcName].push({desc:descHtml,badge:badgeHtml,precio:parseFloat(r.value)||0,esCant:!!cantCircle});
+  });
+  var cantidadYaMostradaPDF=false;
+  var precioYaMostradoPDF=false;
+  ordenServicios.forEach(function(svcName){
+    var itemsSvc=gruposPorServicio[svcName];
+    var tieneCant=itemsSvc.some(function(it){return it.esCant;});
+    var mostrarCantidadAquiPDF = tieneCant && !cantidadYaMostradaPDF;
+    if(mostrarCantidadAquiPDF) cantidadYaMostradaPDF=true;
+    var mostrarPrecioAquiPDF = !precioYaMostradoPDF;
+    if(mostrarPrecioAquiPDF) precioYaMostradoPDF=true;
+    h+='<div class="svc-block"><div class="svc-header">'+(mostrarCantidadAquiPDF?'<span class="cant-col-lbl">Cantidad</span>':'<span class="cant-col-lbl"></span>')+'<span class="svc-name-flex">'+esc(svcName)+'</span>'+(mostrarPrecioAquiPDF?'<span class="price-col-lbl">Precio</span>':'')+'</div><div class="svc-items">';
+    itemsSvc.forEach(function(it){
+      h+='<div class="svc-item">'+it.badge+'<div class="desc">'+it.desc+'</div><div class="price">$'+it.precio.toFixed(2)+'</div></div>';
+    });
+    h+='</div></div>';
+  });
+
+  // ── Totales — caja verde de "TOTAL PAGADO" en vez de ámbar ──
+  h+='<div class="totals">';
+  h+='<div class="t-row"><span>Subtotal</span><span>$'+subtotal.toFixed(2)+'</span></div>';
+  if(desc>0) h+='<div class="t-row"><span>Descuento</span><span>-$'+desc.toFixed(2)+'</span></div>';
+  if(aplicaItbms) h+='<div class="t-row"><span>ITBMS (7%)</span><span>$'+itbms.toFixed(2)+'</span></div>';
+  h+='<div class="t-final-box"><span class="lbl">✅ TOTAL PAGADO</span><span class="val">$'+total.toFixed(2)+'</span></div>';
+  h+='</div>';
+
+  // ── Garantía (sigue vigente después del pago) ──
+  h+='<div class="garantia"><b>✓ Garantía de Servicio</b> — Cleaning Service & Ani Care se compromete a brindar respaldo total a la calidad de su servicio. En caso de cualquier inconformidad, contamos con una garantía válida por siete (7) días calendario contados a partir de la fecha de entrega del servicio.</div>';
+
+  h+='</div>'; // /pad
+
+  h+='<div class="footer"><div class="footer-row">';
+  h+='<span class="footer-item">'+ICON_PIN+'Panamá, República de Panamá</span>';
+  h+='<span class="footer-item">'+ICON_MAIL+'cleaningserviceanicare.com</span>';
+  h+='<span class="footer-item">'+ICON_PHONE+'+507 6317-1227</span>';
+  h+='</div>¡Gracias por confiar en nosotros!</div>';
 
   h+='</body></html>';
 
@@ -2529,7 +2965,6 @@ function construirDescOrdenada(svcKey, item){
     add(item.telColor ? '🎨 '+item.telColor : '');
     add(medida);
     add(item.areas ? 'Áreas: '+item.areas : '');
-    add(item.otroText);
     add(item.otroText);
     add(motivosTxt);
     add(item.nivTxt ? 'Nivel:'+item.nivTxt : '');
