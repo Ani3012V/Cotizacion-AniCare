@@ -1092,7 +1092,11 @@ function formatPuestos(n){
 // el texto no tiene ningún número (ej: "Butaca", "Puff", "Otros").
 function extraerPuestos(texto){
   if(!texto) return null;
-  var m=texto.match(/(\d+(?:\s*\+\s*\d+)*)\s*puestos?/i);
+  // Ahora reconoce tambien un numero "pelado" sin la palabra puestos (ej. "5"),
+  // igual que la Edge Function calcular-precios y que formatearPuestos() en
+  // Panel Admin -- antes esta version del formulario era la unica que se habia
+  // quedado sin este arreglo, por eso escribir solo "5" no disparaba el aviso.
+  var m=texto.match(/(\d+(?:\s*\+\s*\d+)*)\s*puestos?/i) || texto.match(/^\s*(\d+(?:\s*\+\s*\d+)*)\s*$/);
   if(!m) return null;
   var partes=m[1].split('+');
   var total=0;
