@@ -387,6 +387,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7">El switch de arriba (junto a "Cerrar sesión") guarda tu preferencia entre revisar todo a mano o dejar que el sistema avance solo. Los precios se calculan igual en los dos modos — la diferencia es si tú confirmas cada paso o no.</p>
       </div>
 
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">📧 Secuencia de Correos al Cliente (Modo Manual)</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Hoy ningún correo se manda sin que tú lo dispares con una acción, excepto el primero. Así funciona cada uno:</p>
+        <ol style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:10px">
+          <li><b>Correo 1 — "Solicitud recibida":</b> automático. Se manda solo apenas el cliente envía el formulario público, sin que tengas que hacer nada.</li>
+          <li><b>Correo 2 — "Tu cotización está lista":</b> manual. Revisa la cotización en Pendientes, ponle los precios, y dale clic a <b>"Guardar y Enviar"</b> — ahí se manda el correo (y el WhatsApp) con el link para que el cliente vea los precios y apruebe.</li>
+          <li><b>Correo 3 — "Pago recibido" con Recibo de Pago:</b> pendiente de construir — se mandará al marcar una cotización como pagada.</li>
+        </ol>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7">Es a propósito: como Hogar/Comercial/Pulido son 100% manuales, el sistema nunca le manda una cotización al cliente sin que tú la hayas revisado y confirmado primero.</p>
+      </div>
+
     </div>
   </div>
 </div>
@@ -2421,7 +2432,7 @@ function generarCotizacionPDF(id){
   h+='.svc-item .desc{font-size:12px;color:#4a5568;line-height:1.5;flex:1;text-align:justify;margin-right:16px}';
   h+='.svc-item .price{font-size:12px;font-weight:800;color:#1B2838;white-space:nowrap}';
   h+='.totals{margin-top:16px}';
-  h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 0}';
+  h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 16px}';
   h+='.t-final-box{background:#FEF3E2;border-radius:10px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}';
   h+='.t-final-box .lbl{font-size:14px;font-weight:800;color:#1B2838}';
   h+='.t-final-box .val{font-size:16px;font-weight:900;color:#1B2838}';
@@ -2618,7 +2629,7 @@ function generarReciboPago(id){
   h+='.svc-item .desc{font-size:12px;color:#4a5568;line-height:1.5;flex:1;text-align:justify;margin-right:16px}';
   h+='.svc-item .price{font-size:12px;font-weight:800;color:#1B2838;white-space:nowrap}';
   h+='.totals{margin-top:16px}';
-  h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 0}';
+  h+='.t-row{display:flex;justify-content:space-between;font-size:12px;color:#4a5568;padding:4px 16px}';
   h+='.t-final-box{background:#E9F7EF;border:1.5px solid #2D6A4F;border-radius:10px;padding:12px 16px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}';
   h+='.t-final-box .lbl{font-size:14px;font-weight:800;color:#1B2838}';
   h+='.t-final-box .val{font-size:16px;font-weight:900;color:#1B2838}';
