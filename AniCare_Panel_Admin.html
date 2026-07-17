@@ -733,7 +733,7 @@ function renderTimelineCotizacion(q){
   var badgeTxt={pendiente:'Pendiente',cotizado:'Cotizado',aprobada:'✅ Aprobada',pagada:'💰 Pagada',cancelada:'❌ Cancelada'}[q.estado]||q.estado;
 
   var h='<div class="tl-card">';
-  h+='<div class="tl-info"><span class="num">'+(q.numero_cot||'')+'</span><span class="fecha">'+nombreCliente(q)+'</span></div>';
+  h+='<div class="tl-info"><span class="num">'+esc(q.numero_cot||'')+'</span><span class="fecha">'+esc(nombreCliente(q))+'</span></div>';
   h+='<div class="tl-hline">';
   for(var i=0;i<pasos.length;i++){
     var p=pasos[i];
@@ -951,13 +951,13 @@ function renderDirectorio(){
 
       h+='<div class="dir-entry">';
       h+='<div class="dir-entry-name" onclick="toggleClienteDir(\''+uid+'\')">';
-      h+='<span>'+nombreCliente(q)+'</span>';
+      h+='<span>'+esc(nombreCliente(q))+'</span>';
       h+='<span class="dir-entry-chev" id="chev-'+uid+'">▸</span>';
       h+='</div>';
       h+='<div class="dir-entry-body" id="body-'+uid+'">';
-      h+='<div class="dir-sub">'+(esEmp?'🏢 Empresa'+(q.cliente_ruc?' · RUC '+q.cliente_ruc:''):(q.cliente_ph?'🏘️ '+q.cliente_ph:(q.cliente_tipo||'')))+'</div>';
-      if(q.cliente_telefono) h+='<div class="dir-row"><span class="ico">📱</span>'+q.cliente_telefono+'</div>';
-      if(q.cliente_email) h+='<div class="dir-row"><span class="ico">📧</span>'+q.cliente_email+'</div>';
+      h+='<div class="dir-sub">'+(esEmp?'🏢 Empresa'+(q.cliente_ruc?' · RUC '+esc(q.cliente_ruc):''):(q.cliente_ph?'🏘️ '+esc(q.cliente_ph):esc(q.cliente_tipo||'')))+'</div>';
+      if(q.cliente_telefono) h+='<div class="dir-row"><span class="ico">📱</span>'+esc(q.cliente_telefono)+'</div>';
+      if(q.cliente_email) h+='<div class="dir-row"><span class="ico">📧</span>'+esc(q.cliente_email)+'</div>';
       h+='<div class="dir-stats">';
       h+='<div class="dir-stat"><div class="n">'+g.cotizaciones.length+'</div><div class="l">Total</div></div>';
       h+='<div class="dir-stat"><div class="n" style="color:#40916C">'+aprobadas+'</div><div class="l">Aprob.</div></div>';
@@ -1866,8 +1866,8 @@ function renderCotizaciones(){
 
     h+='<div class="q-card '+(q.estado==='cotizado'?'cotizado':'')+'" id="qcard-'+q.id+'">';
     h+='<div class="q-head" onclick="toggleQuote('+q.id+')">';
-    h+='<span class="q-num">'+(q.numero_cot||'')+'</span>';
-    h+='<span class="q-name">'+nombreCliente(q)+'</span>';
+    h+='<span class="q-num">'+esc(q.numero_cot||'')+'</span>';
+    h+='<span class="q-name">'+esc(nombreCliente(q))+'</span>';
     h+='<span class="q-date">'+fecha+'</span>';
     h+='<span class="q-status status-'+q.estado+(vencido?' vencido':'')+'">'+(estadoTxt[q.estado]||q.estado)+(vencido?' (+7 días)':'')+'</span>';
     h+='<span class="q-chevron">▾</span></div>';
@@ -1914,12 +1914,12 @@ function renderQuoteDetail(id){
   var h=tieneHistorial?'<div class="q-split"><div class="q-main">':'<div class="q-main" style="padding:16px">';
 
   h+='<div class="client-info">';
-  h+='<div><b>Cliente:</b> '+nombreCliente(q)+' ('+(q.cliente_tipo||'-')+')</div>';
-  if(q.cliente_ruc) h+='<div><b>RUC:</b> '+q.cliente_ruc+'</div>';
-  if(q.cliente_ph) h+='<div><b>PH/Residencial:</b> '+q.cliente_ph+'</div>';
-  if(q.cliente_telefono) h+='<div><b>Teléfono:</b> '+q.cliente_telefono+'</div>';
-  if(q.cliente_email) h+='<div><b>Correo:</b> '+q.cliente_email+'</div>';
-  if(q.cliente_direccion) h+='<div><b>Dirección:</b> '+q.cliente_direccion+'</div>';
+  h+='<div><b>Cliente:</b> '+esc(nombreCliente(q))+' ('+esc(q.cliente_tipo||'-')+')</div>';
+  if(q.cliente_ruc) h+='<div><b>RUC:</b> '+esc(q.cliente_ruc)+'</div>';
+  if(q.cliente_ph) h+='<div><b>PH/Residencial:</b> '+esc(q.cliente_ph)+'</div>';
+  if(q.cliente_telefono) h+='<div><b>Teléfono:</b> '+esc(q.cliente_telefono)+'</div>';
+  if(q.cliente_email) h+='<div><b>Correo:</b> '+esc(q.cliente_email)+'</div>';
+  if(q.cliente_direccion) h+='<div><b>Dirección:</b> '+esc(q.cliente_direccion)+'</div>';
   if(q.fecha_servicio) h+='<div><b>Fecha del servicio:</b> '+esc(formatearFechaDDMM(q.fecha_servicio))+'</div>';
   if(q.cliente_recurrente) h+='<div>⭐ Cliente Recurrente</div>';
   h+='</div>';
