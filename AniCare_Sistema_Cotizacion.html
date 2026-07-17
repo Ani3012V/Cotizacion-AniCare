@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://www.google.com/recaptcha/api.js?render=6LfAkE4tAAAAAB1_UlzXxnO2SOHLY7gcD7ej9TZQ"></script>
+<script src="https://www.google.com/recaptcha/enterprise.js?render=6LfAkE4tAAAAAB1_UlzXxnO2SOHLY7gcD7ej9TZQ"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>AniCare — Solicitud de Cotización</title>
 <style>
@@ -669,10 +669,10 @@ var _ultimoErrorGuardado = null; // mensaje amigable del último rechazo (límit
 // trabar el formulario — la Edge Function decide qué hacer si falta el token.
 function obtenerTokenCaptcha(){
   return new Promise(function(resolve){
-    if(typeof grecaptcha === 'undefined' || !grecaptcha.ready){ resolve(null); return; }
+    if(typeof grecaptcha === 'undefined' || !grecaptcha.enterprise || !grecaptcha.enterprise.ready){ resolve(null); return; }
     try{
-      grecaptcha.ready(function(){
-        grecaptcha.execute(RECAPTCHA_SITE_KEY, {action:'crear_cotizacion'})
+      grecaptcha.enterprise.ready(function(){
+        grecaptcha.enterprise.execute(RECAPTCHA_SITE_KEY, {action:'crear_cotizacion'})
           .then(resolve)
           .catch(function(){ resolve(null); });
       });
