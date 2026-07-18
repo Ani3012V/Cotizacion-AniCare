@@ -223,6 +223,68 @@ async function notificarPorEmail(decision, motivo){
   } catch(e){ console.warn('No se pudo notificar por email:', e); }
 }
 
+// Arma el resumen de servicios en texto plano (mismo criterio que renderQuote/
+// descItem) para incluirlo en el cuerpo del Correo 3 y en el adjunto .ics.
+function construirResumenServiciosTexto(){
+  var q = quoteData;
+  var servicios = q.servicios || [];
+  var esFormatoObjeto = servicios.length>0 && typeof servicios[0]==='object';
+  var lineas = [];
+  if(esFormatoObjeto){
+    var grupos={}, orden=[];
+    servicios.forEach(function(it){
+      var key=(it.svc||'otros');
+      var nombre=TIPOS_NOMBRE[key]||key;
+      if(!grupos[nombre]){ grupos[nombre]=[]; orden.push(nombre); }
+      grupos[nombre].push(it);
+    });
+    orden.forEach(function(nombre){
+      lineas.push(nombre+':');
+      grupos[nombre].forEach(function(it){ lineas.push('  • '+descItem(it)); });
+    });
+  } else {
+    for(var i=0;i<servicios.length;i++){
+      var ls = (servicios[i]||'').split('\n');
+      lineas.push(ls[0].replace(':','')+':');
+      for(var li=1;li<ls.length;li++){ if(ls[li].trim()) lineas.push('  • '+ls[li].replace(/^\s*\d+\.\s*/,'')); }
+    }
+  }
+  lineas.push('');
+  lineas.push('Subtotal: $'+(q.subtotal||0).toFixed(2));
+  if(q.descuento>0) lineas.push('Descuento: -$'+q.descuento.toFixed(2));
+  lineas.push('ITBMS (7%): $'+(q.itbms||0).toFixed(2));
+  lineas.push('TOTAL: $'+(q.total||0).toFixed(2));
+  return lineas.join('\n');
+}
+
+// Correo 3 (nuevo) — confirmación al CLIENTE de que su servicio quedó
+// aprobado, con la fecha destacada y un botón para agendarlo en su calendario.
+// Se envía además de notificarPorEmail() (que solo avisa a Ani por dentro).
+async function enviarCorreoAprobacionCliente(){
+  if(!quoteData || !quoteData.cliente_email) return; // sin correo no hay a quién enviarle
+  try{
+    await fetch(SUPA_URL+'/functions/v1/enviar-email', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer '+SUPA_KEY
+      },
+      body: JSON.stringify({
+        tipo:'cotizacion_aprobada_cliente',
+        numCot:quoteData.numero_cot,
+        cliente:{
+          nombre:quoteData.cliente_nombre,
+          email:quoteData.cliente_email,
+          direccion:quoteData.cliente_direccion||''
+        },
+        servicios:construirResumenServiciosTexto(),
+        fecha:quoteData.fecha_servicio||''
+      })
+    });
+  } catch(e){ console.warn('No se pudo enviar el correo de confirmación al cliente:', e); }
+}
+
 async function aprobar(){
   var body = document.getElementById('bodyContent');
   body.innerHTML = '<div class="loading"><div class="spinner"></div>Procesando...</div>';
@@ -233,7 +295,8 @@ async function aprobar(){
       body.innerHTML = '<div class="error-box">⚠️ No se pudo procesar. Es posible que ya hayas respondido antes.</div>';
       return;
     }
-    notificarPorEmail('aprobada', null);
+    notificarPorEmail('aprobada', null); // aviso interno a Ani (ya existía)
+    enviarCorreoAprobacionCliente(); // Correo 3 (nuevo) — confirmación al cliente con botón de agendar
     mostrarResultado(true);
   } catch(e){
     body.innerHTML = '<div class="error-box">⚠️ Error al procesar. Intenta de nuevo o contáctanos por WhatsApp.</div>';
