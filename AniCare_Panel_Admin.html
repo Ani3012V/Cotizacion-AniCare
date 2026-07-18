@@ -2390,22 +2390,35 @@ function generarCotizacionPDFBase64(id){
   return new Promise(function(resolve){
     var r=construirHTMLCotizacionPDF(id);
     if(!r || typeof html2pdf==='undefined'){ resolve(null); return; }
+    // Usa srcdoc en vez de contentDocument.write(): write() dispara una carga
+    // de "URL" en el iframe, que Chrome bloquea con file:// (cada archivo local
+    // se trata como un origen único, "Unsafe attempt to load URL"). srcdoc no
+    // hace ninguna carga de URL, así que funciona igual desde GitHub Pages
+    // (https://) que abriendo el archivo directo en la computadora (file://).
     var iframe=document.createElement('iframe');
     iframe.style.position='fixed'; iframe.style.left='-9999px'; iframe.style.width='800px'; iframe.style.height='1200px';
+    var listo=false;
+    function limpiarYResolver(valor){
+      if(listo) return; listo=true;
+      if(iframe.parentNode) document.body.removeChild(iframe);
+      resolve(valor);
+    }
+    iframe.onload=function(){
+      setTimeout(function(){
+        try{
+          html2pdf().from(iframe.contentDocument.body).set({
+            margin:0, filename:'cotizacion.pdf',
+            html2canvas:{scale:2,useCORS:true},
+            jsPDF:{unit:'pt',format:'letter'}
+          }).outputPdf('datauristring').then(function(uri){
+            limpiarYResolver(uri.split(',')[1]);
+          }).catch(function(){ limpiarYResolver(null); });
+        }catch(e){ limpiarYResolver(null); }
+      },200);
+    };
+    setTimeout(function(){ limpiarYResolver(null); },8000);
     document.body.appendChild(iframe);
-    iframe.contentDocument.open();
-    iframe.contentDocument.write(r.html);
-    iframe.contentDocument.close();
-    setTimeout(function(){
-      html2pdf().from(iframe.contentDocument.body).set({
-        margin:0, filename:'cotizacion.pdf',
-        html2canvas:{scale:2,useCORS:true},
-        jsPDF:{unit:'pt',format:'letter'}
-      }).outputPdf('datauristring').then(function(uri){
-        document.body.removeChild(iframe);
-        resolve(uri.split(',')[1]);
-      }).catch(function(){ document.body.removeChild(iframe); resolve(null); });
-    },300);
+    iframe.srcdoc=r.html;
   });
 }
 
