@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh;color:#2d3748}
@@ -2280,6 +2281,17 @@ async function guardarYEnviarCotizacion(id){
 async function enviarCorreoCotizacion(q){
   var linkAprobacion = q.token_aprobacion ? (GITHUB_BASE_URL+'AniCare_Aprobar_Cotizacion.html?t='+q.token_aprobacion) : '';
   try{
+    // Genera el PDF real (no el de imprimir manual) para adjuntarlo, y arma un
+    // resumen en texto de servicios+total para que el cuerpo del correo también
+    // muestre el detalle, no solo el adjunto — así el cliente ve el precio de
+    // inmediato sin tener que abrir el PDF primero.
+    var pdfBase64=null, resumenTexto='', totalCot=q.total||0;
+    try{
+      var construido=construirHTMLCotizacionPDF(q.id);
+      if(construido){ resumenTexto=construido.resumenTexto; totalCot=construido.total; }
+      pdfBase64=await generarCotizacionPDFBase64(q.id);
+    }catch(e){ console.warn('No se pudo generar el PDF para adjuntar:',e); }
+
     // BUG CORREGIDO: faltaban los headers 'apikey'/'Authorization' que exige la
     // función — sin ellos la llamada fallaba en silencio (nunca llegaba el correo,
     // el error solo quedaba en consola). Ahora usa la misma SUPABASE_KEY que ya
@@ -2299,7 +2311,10 @@ async function enviarCorreoCotizacion(q){
           telefono:q.cliente_telefono||'',
           email:q.cliente_email||''
         },
-        linkAprobacion:linkAprobacion
+        linkAprobacion:linkAprobacion,
+        servicios:resumenTexto,
+        total:totalCot,
+        pdfBase64:pdfBase64
       })
     });
     if(!resp.ok){ console.warn('enviar-email respondió con error:', resp.status, await resp.text()); }
@@ -2362,8 +2377,41 @@ async function guardarPrecios(id){
 }
 
 function generarCotizacionPDF(id){
+  var r=construirHTMLCotizacionPDF(id);
+  if(!r) return;
+  var win=window.open('','_blank');
+  if(win){ win.document.write(r.html); win.document.close(); setTimeout(function(){win.print();},400); }
+}
+
+// Genera el mismo PDF de arriba pero como archivo real (base64), sin depender
+// de que alguien elija "Guardar como PDF" en el diálogo de impresión. Se usa
+// para mandar la cotización adjunta por correo automáticamente.
+function generarCotizacionPDFBase64(id){
+  return new Promise(function(resolve){
+    var r=construirHTMLCotizacionPDF(id);
+    if(!r || typeof html2pdf==='undefined'){ resolve(null); return; }
+    var iframe=document.createElement('iframe');
+    iframe.style.position='fixed'; iframe.style.left='-9999px'; iframe.style.width='800px'; iframe.style.height='1200px';
+    document.body.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(r.html);
+    iframe.contentDocument.close();
+    setTimeout(function(){
+      html2pdf().from(iframe.contentDocument.body).set({
+        margin:0, filename:'cotizacion.pdf',
+        html2canvas:{scale:2,useCORS:true},
+        jsPDF:{unit:'pt',format:'letter'}
+      }).outputPdf('datauristring').then(function(uri){
+        document.body.removeChild(iframe);
+        resolve(uri.split(',')[1]);
+      }).catch(function(){ document.body.removeChild(iframe); resolve(null); });
+    },300);
+  });
+}
+
+function construirHTMLCotizacionPDF(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
-  if(!q) return;
+  if(!q) return null;
   var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
   var subtotal=0;
   var hayPendientes=false;
@@ -2556,8 +2604,18 @@ function generarCotizacionPDF(id){
 
   h+='</body></html>';
 
-  var win=window.open('','_blank');
-  if(win){ win.document.write(h); win.document.close(); setTimeout(function(){win.print();},400); }
+  var resumenTexto='';
+  ordenServicios.forEach(function(svcName){
+    var itemsSvc=gruposPorServicio[svcName];
+    var subtotalSvc=itemsSvc.reduce(function(a,it){return a+(it.precioVacio?0:it.precio);},0);
+    resumenTexto+=svcName+' — $'+subtotalSvc.toFixed(2)+'\n';
+  });
+  resumenTexto+='\nSubtotal: $'+subtotal.toFixed(2);
+  if(desc>0) resumenTexto+='\nDescuento: -$'+desc.toFixed(2);
+  if(aplicaItbms) resumenTexto+='\nITBMS (7%): $'+itbms.toFixed(2);
+  resumenTexto+='\nTOTAL: $'+total.toFixed(2);
+
+  return {html:h, total:total, subtotal:subtotal, resumenTexto:resumenTexto};
 }
 
 // ===================== RECIBO DE PAGO =====================
