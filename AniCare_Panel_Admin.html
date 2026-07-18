@@ -304,6 +304,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
     <button class="tab-btn" id="tabPrecios" onclick="cambiarTab('precios')">💲 Gestión de Precios</button>
     <button class="tab-btn" id="tabRecibos" onclick="abrirModalRecibos()">🧾 Recibos de Pago</button>
     <button class="tab-btn" id="tabReglasCal" onclick="abrirModalReglasCalendarizacion()">🗓️ Reglas de Calendarización</button>
+    <button class="tab-btn" id="tabAgenda" onclick="cambiarTab('agenda')">📆 Agenda Semanal</button>
     <button class="tab-btn" id="tabDirectorio" onclick="cambiarTab('directorio')">📇 Directorio</button>
     <button class="tab-btn" id="tabIndicaciones" onclick="cambiarTab('indicaciones')">📖 Indicaciones</button>
   </div>
@@ -329,6 +330,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
     </div>
     <div id="preciosTablaCompleta"><div class="loading">Cargando precios…</div></div>
     <button class="save-settings-btn" onclick="guardarTodosPrecios()" style="background:linear-gradient(135deg,#2D6A4F,#40916C);margin-top:8px">💾 Guardar Todos los Precios</button>
+  </div>
+
+  <div class="page" id="viewAgenda" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <button onclick="cambiarSemanaAgenda(-1)" style="background:white;border:1.5px solid #D8F3DC;color:#1B4332;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">← Semana anterior</button>
+      <div id="agendaRangoLabel" style="font-size:14px;font-weight:800;color:#1B4332"></div>
+      <button onclick="cambiarSemanaAgenda(1)" style="background:white;border:1.5px solid #D8F3DC;color:#1B4332;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">Semana siguiente →</button>
+    </div>
+    <div style="display:flex;gap:10px;font-size:11px;color:#718096;margin-bottom:14px">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#40916C;margin-right:4px"></span>Con espacio</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#F0B75A;margin-right:4px"></span>Alta demanda (≥75%)</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#CBD5E0;margin-right:4px"></span>Cerrado</span>
+    </div>
+    <div id="agendaDias" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"><div class="loading">Cargando agenda…</div></div>
   </div>
 
   <div class="page" id="viewDirectorio" style="display:none">
@@ -728,6 +743,103 @@ function evaluarCapacidadDia(fechaISO, minutosNecesarios, idExcluir){
   };
 }
 
+// ===================== VISTA "AGENDA SEMANAL" =====================
+// Tarjetas por día (estilo pipeline), barra de ocupación por color (verde =
+// con espacio, coral/naranja = ≥75% ocupado, gris = cerrado), chips con cada
+// cliente agendado ese día. Usa el mismo motor de calendarización (reglas +
+// evaluarCapacidadDia) que ya alimenta la pantalla de confirmación de hora.
+var agendaSemanaOffset=0; // 0 = semana actual, -1 = anterior, +1 = siguiente…
+
+function inicioDeSemana(fecha){
+  var d=new Date(fecha);
+  var dia=d.getDay(); // 0=domingo…6=sábado
+  var diff=dia===0?-6:1-dia; // retrocede hasta el lunes de esa semana
+  d.setDate(d.getDate()+diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function cambiarSemanaAgenda(delta){
+  agendaSemanaOffset+=delta;
+  renderAgendaSemanal();
+}
+
+function renderAgendaSemanal(){
+  var cont=document.getElementById('agendaDias');
+  var label=document.getElementById('agendaRangoLabel');
+  if(!cont) return;
+
+  var hoy=new Date();
+  var lunes=inicioDeSemana(hoy);
+  lunes.setDate(lunes.getDate()+agendaSemanaOffset*7);
+
+  var dias=[];
+  for(var i=0;i<7;i++){
+    var d=new Date(lunes);
+    d.setDate(d.getDate()+i);
+    dias.push(d);
+  }
+
+  var fmtISO=function(d){ return d.toISOString().slice(0,10); };
+  label.textContent=dias[0].toLocaleDateString('es-PA',{day:'2-digit',month:'short'})+' — '+dias[6].toLocaleDateString('es-PA',{day:'2-digit',month:'short',year:'numeric'});
+
+  var h='';
+  dias.forEach(function(d){
+    var fechaISO=fmtISO(d);
+    var reservasDia=(todasCotizaciones||[]).filter(function(q){
+      return q.fecha_servicio===fechaISO && (q.estado==='aprobada'||q.estado==='pagada');
+    });
+    var cap=evaluarCapacidadDia(fechaISO, 0, null); // ocupación real del día, sin agregar nada nuevo
+    var cerrado = cap.motivo==='Domingo — cerrado';
+    var colorBarra = cerrado ? '#CBD5E0' : (cap.alerta ? '#F0B75A' : '#40916C');
+    var pct = cerrado ? 0 : Math.min(100, cap.ocupacionPct||0);
+    var esHoy = fmtISO(new Date())===fechaISO;
+
+    h+='<div style="background:white;border:1.5px solid '+(esHoy?'#40916C':'#E2E8F0')+';border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px">';
+    h+='<div><div style="font-size:11px;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.3px">'+d.toLocaleDateString('es-PA',{weekday:'long'})+'</div>';
+    h+='<div style="font-size:15px;font-weight:900;color:#1B2838">'+d.toLocaleDateString('es-PA',{day:'2-digit',month:'short'})+'</div></div>';
+
+    if(cerrado){
+      h+='<div style="font-size:11px;color:#94A3B8;font-weight:700">Cerrado</div>';
+    } else {
+      h+='<div style="background:#F1F5F4;border-radius:6px;height:7px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+colorBarra+'"></div></div>';
+      h+='<div style="font-size:10.5px;color:#718096">'+pct+'% ocupado · '+reservasDia.length+'/'+((CONFIG_CALENDARIZACION&&CONFIG_CALENDARIZACION.max_clientes_dia)||2)+' clientes</div>';
+    }
+
+    if(reservasDia.length>0){
+      h+='<div style="display:flex;flex-direction:column;gap:5px;margin-top:2px">';
+      reservasDia.forEach(function(q){
+        var chipColor = q.estado==='pagada' ? '#E9F7EF' : '#FEF3E2';
+        var chipBorder = q.estado==='pagada' ? '#2D6A4F' : '#B45309';
+        var chipTxt = q.estado==='pagada' ? '#1B4332' : '#78350F';
+        h+='<div style="background:'+chipColor+';border:1px solid '+chipBorder+';border-radius:8px;padding:6px 8px;cursor:pointer" onclick="irACotizacion(\''+q.numero_cot+'\')">';
+        h+='<div style="font-size:11px;font-weight:800;color:'+chipTxt+'">'+esc(nombreCliente(q))+'</div>';
+        h+='<div style="font-size:9.5px;color:#718096">N° '+esc(q.numero_cot)+' · '+(q.servicios?q.servicios.length:0)+' servicio(s)</div>';
+        h+='</div>';
+      });
+      h+='</div>';
+    }
+
+    h+='</div>';
+  });
+
+  cont.innerHTML=h;
+}
+
+// Salta a la pestaña de Cotizaciones y abre la tarjeta correspondiente —
+// se usa al hacer clic en un chip de cliente dentro de la Agenda Semanal.
+function irACotizacion(numeroCot){
+  var q=todasCotizaciones.find(function(x){return x.numero_cot===numeroCot;});
+  if(!q) return;
+  cambiarTab('cotizaciones');
+  var chip=document.querySelector('.filter-chip[data-estado="'+q.estado+'"]');
+  if(chip) filtrarEstado(chip,q.estado); else renderCotizaciones();
+  setTimeout(function(){
+    var card=document.getElementById('qcard-'+q.id);
+    if(card){ card.classList.add('open'); renderQuoteDetail(q.id); card.scrollIntoView({behavior:'smooth',block:'center'}); }
+  },150);
+}
+
 // ── Modal "Reglas de Calendarización" ──
 function abrirModalReglasCalendarizacion(){
   document.getElementById('modalReglasCal').classList.add('show');
@@ -851,14 +963,17 @@ function toast(msg){
 function cambiarTab(tab){
   document.getElementById('tabCot').classList.toggle('active',tab==='cotizaciones');
   document.getElementById('tabPrecios').classList.toggle('active',tab==='precios');
+  document.getElementById('tabAgenda').classList.toggle('active',tab==='agenda');
   document.getElementById('tabDirectorio').classList.toggle('active',tab==='directorio');
   document.getElementById('tabIndicaciones').classList.toggle('active',tab==='indicaciones');
   document.getElementById('viewCotizaciones').style.display=tab==='cotizaciones'?'block':'none';
   document.getElementById('viewPrecios').style.display=tab==='precios'?'block':'none';
+  document.getElementById('viewAgenda').style.display=tab==='agenda'?'block':'none';
   document.getElementById('viewDirectorio').style.display=tab==='directorio'?'block':'none';
   document.getElementById('viewIndicaciones').style.display=tab==='indicaciones'?'block':'none';
   if(tab==='precios'){ cargarTodosPrecios(); }
   if(tab==='directorio'){ renderDirectorio(); }
+  if(tab==='agenda'){ renderAgendaSemanal(); }
 }
 
 // ===================== COTIZACIONES =====================
