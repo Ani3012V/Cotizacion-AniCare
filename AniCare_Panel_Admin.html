@@ -812,7 +812,7 @@ function renderAgendaSemanal(){
         var chipColor = q.estado==='pagada' ? '#E9F7EF' : '#FEF3E2';
         var chipBorder = q.estado==='pagada' ? '#2D6A4F' : '#B45309';
         var chipTxt = q.estado==='pagada' ? '#1B4332' : '#78350F';
-        h+='<div style="background:'+chipColor+';border:1px solid '+chipBorder+';border-radius:8px;padding:6px 8px;cursor:pointer" onclick="irACotizacion(\''+q.numero_cot+'\')">';
+        h+='<div style="background:'+chipColor+';border:1px solid '+chipBorder+';border-radius:8px;padding:6px 8px;cursor:pointer" onclick="abrirCotizacionDesdeAgenda(\''+q.numero_cot+'\')">';
         h+='<div style="font-size:11px;font-weight:800;color:'+chipTxt+'">'+esc(nombreCliente(q))+'</div>';
         h+='<div style="font-size:9.5px;color:#718096">N° '+esc(q.numero_cot)+' · '+(q.servicios?q.servicios.length:0)+' servicio(s)</div>';
         h+='</div>';
@@ -828,7 +828,9 @@ function renderAgendaSemanal(){
 
 // Salta a la pestaña de Cotizaciones y abre la tarjeta correspondiente —
 // se usa al hacer clic en un chip de cliente dentro de la Agenda Semanal.
-function irACotizacion(numeroCot){
+// (Nombre distinto de irACotizacion(id) —función ya existente que salta por
+// id numérico— para no pisarla; esta busca por número de cotización.)
+function abrirCotizacionDesdeAgenda(numeroCot){
   var q=todasCotizaciones.find(function(x){return x.numero_cot===numeroCot;});
   if(!q) return;
   cambiarTab('cotizaciones');
