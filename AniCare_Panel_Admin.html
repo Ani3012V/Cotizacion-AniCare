@@ -1637,9 +1637,15 @@ async function confirmarMetodoPago(){
       // El recibo se genera leyendo los precios ya en pantalla — se espera un
       // instante extra a que renderQuoteDetail termine de dibujar los inputs.
       setTimeout(function(){
-        generarReciboPago(id);
+        // IMPORTANTE: el correo va primero. generarReciboPago() abre un diálogo
+        // nativo de impresión (window.print()), y ese diálogo congela la pestaña
+        // por completo mientras está abierto — si se dispara antes, corta el
+        // envío del correo a la mitad y el cliente nunca lo recibe. Por eso el
+        // correo sale primero y el PDF de imprimir se deja para el final, con
+        // tiempo de sobra para que el correo ya haya salido de la pestaña.
         var q2=todasCotizaciones.find(function(x){return x.id===id;});
         enviarCorreoPagoRecibido(q2); // Correo 4 (antes Correo 3) — pago recibido
+        setTimeout(function(){ generarReciboPago(id); },2500);
       },300);
     },100);
   } catch(e){ toast('❌ Error: '+e.message); }
