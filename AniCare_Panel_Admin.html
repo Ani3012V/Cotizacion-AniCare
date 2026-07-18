@@ -2269,8 +2269,11 @@ async function guardarYEnviarCotizacion(id){
     return; // guardarPrecios falló — no continuar con el envío
   }
   try{
-    await enviarLinkAprobacion(id); // abre WhatsApp + marca enviado_cliente
-    await enviarCorreoCotizacion(q); // envía también por correo
+    // BUG CORREGIDO (auditoría 18-jul-2026): antes se llamaba a enviarCorreoCotizacion
+    // aquí Y DENTRO de enviarLinkAprobacion() -- el cliente recibía el correo de
+    // cotización DOS VECES cada vez que Ani hacía clic en este botón. enviarLinkAprobacion
+    // ya se encarga de WhatsApp + correo internamente, así que aquí solo se llama una vez.
+    await enviarLinkAprobacion(id); // abre WhatsApp + envía correo + marca enviado_cliente
     toast('✅ Cotización enviada exitosamente');
   } catch(e){
     toast('⚠️ Se guardó, pero hubo un problema al enviar: '+e.message);
@@ -2390,35 +2393,51 @@ function generarCotizacionPDFBase64(id){
   return new Promise(function(resolve){
     var r=construirHTMLCotizacionPDF(id);
     if(!r || typeof html2pdf==='undefined'){ resolve(null); return; }
-    // Usa srcdoc en vez de contentDocument.write(): write() dispara una carga
-    // de "URL" en el iframe, que Chrome bloquea con file:// (cada archivo local
-    // se trata como un origen único, "Unsafe attempt to load URL"). srcdoc no
-    // hace ninguna carga de URL, así que funciona igual desde GitHub Pages
-    // (https://) que abriendo el archivo directo en la computadora (file://).
-    var iframe=document.createElement('iframe');
-    iframe.style.position='fixed'; iframe.style.left='-9999px'; iframe.style.width='800px'; iframe.style.height='1200px';
+
+    // IMPORTANTE — no usar iframe aquí. Se probó a fondo: la librería html2canvas
+    // (la que usa html2pdf por debajo) NO pinta los fondos de color (el header
+    // oscuro, por ejemplo) cuando el contenido está dentro de un <iframe>, ni
+    // tampoco si el contenedor usa position:fixed/absolute/opacity:0 — en todos
+    // esos casos el fondo sale en blanco aunque el resto del texto se vea bien.
+    // La única forma confiable es insertarlo como un elemento normal, dentro del
+    // flujo del documento. Por eso se agrega al final de la página (no al inicio,
+    // para no empujar el contenido visible) y se saca apenas termina la foto —
+    // el usuario puede notar un parpadeo breve al fondo de la página, es normal.
+    var styleTag=document.createElement('style');
+    var estilos=(r.html.match(/<style>([\s\S]*?)<\/style>/)||[,''])[1];
+    styleTag.setAttribute('data-pdf-temporal','1');
+    styleTag.textContent=estilos;
+
+    var cuerpo=(r.html.match(/<body>([\s\S]*?)<\/body>/)||[,''])[1];
+    var wrap=document.createElement('div');
+    wrap.setAttribute('data-pdf-temporal','1');
+    wrap.style.cssText='width:750px;background:white';
+    wrap.innerHTML=cuerpo;
+
+    document.head.appendChild(styleTag);
+    document.body.appendChild(wrap);
+
     var listo=false;
     function limpiarYResolver(valor){
       if(listo) return; listo=true;
-      if(iframe.parentNode) document.body.removeChild(iframe);
+      if(wrap.parentNode) document.body.removeChild(wrap);
+      if(styleTag.parentNode) document.head.removeChild(styleTag);
       resolve(valor);
     }
-    iframe.onload=function(){
-      setTimeout(function(){
-        try{
-          html2pdf().from(iframe.contentDocument.body).set({
-            margin:0, filename:'cotizacion.pdf',
-            html2canvas:{scale:2,useCORS:true},
-            jsPDF:{unit:'pt',format:'letter'}
-          }).outputPdf('datauristring').then(function(uri){
-            limpiarYResolver(uri.split(',')[1]);
-          }).catch(function(){ limpiarYResolver(null); });
-        }catch(e){ limpiarYResolver(null); }
-      },200);
-    };
-    setTimeout(function(){ limpiarYResolver(null); },8000);
-    document.body.appendChild(iframe);
-    iframe.srcdoc=r.html;
+
+    setTimeout(function(){
+      try{
+        html2pdf().from(wrap).set({
+          margin:0, filename:'cotizacion.pdf',
+          html2canvas:{scale:2, useCORS:true},
+          jsPDF:{unit:'pt',format:'letter'},
+          pagebreak:{mode:['avoid-all','css']}
+        }).outputPdf('datauristring').then(function(uri){
+          limpiarYResolver(uri.split(',')[1]);
+        }).catch(function(){ limpiarYResolver(null); });
+      }catch(e){ limpiarYResolver(null); }
+    },400);
+    setTimeout(function(){ limpiarYResolver(null); },12000);
   });
 }
 
