@@ -1636,7 +1636,11 @@ async function confirmarMetodoPago(){
       if(card){card.classList.add('open'); renderQuoteDetail(id);}
       // El recibo se genera leyendo los precios ya en pantalla — se espera un
       // instante extra a que renderQuoteDetail termine de dibujar los inputs.
-      setTimeout(function(){ generarReciboPago(id); },300);
+      setTimeout(function(){
+        generarReciboPago(id);
+        var q2=todasCotizaciones.find(function(x){return x.id===id;});
+        enviarCorreoPagoRecibido(q2); // Correo 4 (antes Correo 3) — pago recibido
+      },300);
     },100);
   } catch(e){ toast('❌ Error: '+e.message); }
 }
@@ -2460,7 +2464,7 @@ function generarCotizacionPDFBase64(id){
           margin:0, filename:'cotizacion.pdf',
           html2canvas:{scale:2, useCORS:true},
           jsPDF:{unit:'pt',format:'letter'},
-          pagebreak:{mode:['avoid-all','css']}
+          pagebreak:{mode:['avoid-all','css','legacy']}
         }).outputPdf('datauristring').then(function(uri){
           limpiarYResolver(uri.split(',')[1]);
         }).catch(function(){ limpiarYResolver(null); });
@@ -2687,8 +2691,92 @@ function construirHTMLCotizacionPDF(id){
 // Electrónica (en Panamá eso requiere pasar por el SFEP/DGI con CUFE — ver
 // nota en la Bitácora). Esto es solo un comprobante interno de pago.
 function generarReciboPago(id){
+  var r=construirHTMLReciboPDF(id);
+  if(!r) return;
+  var win=window.open('','_blank');
+  if(win){ win.document.write(r.html); win.document.close(); setTimeout(function(){win.print();},400); }
+}
+
+// Genera el mismo PDF del recibo pero como archivo real (base64), sin depender
+// de "Guardar como PDF" del diálogo de impresión — se usa para adjuntarlo al
+// Correo 4 (pago recibido), igual que generarCotizacionPDFBase64 con el
+// Correo 2. Mismo truco de inserción en el DOM real (ver nota en esa función
+// sobre por qué no se puede usar un iframe ni position:fixed/absolute).
+function generarReciboPDFBase64(id){
+  return new Promise(function(resolve){
+    var r=construirHTMLReciboPDF(id);
+    if(!r || typeof html2pdf==='undefined'){ resolve(null); return; }
+
+    var styleTag=document.createElement('style');
+    var estilos=(r.html.match(/<style>([\s\S]*?)<\/style>/)||[,''])[1];
+    styleTag.setAttribute('data-pdf-temporal','1');
+    styleTag.textContent=estilos;
+
+    var cuerpo=(r.html.match(/<body>([\s\S]*?)<\/body>/)||[,''])[1];
+    var wrap=document.createElement('div');
+    wrap.setAttribute('data-pdf-temporal','1');
+    wrap.style.cssText='width:750px;background:white';
+    wrap.innerHTML=cuerpo;
+
+    document.head.appendChild(styleTag);
+    document.body.appendChild(wrap);
+
+    var listo=false;
+    function limpiarYResolver(valor){
+      if(listo) return; listo=true;
+      if(wrap.parentNode) document.body.removeChild(wrap);
+      if(styleTag.parentNode) document.head.removeChild(styleTag);
+      resolve(valor);
+    }
+
+    setTimeout(function(){
+      try{
+        html2pdf().from(wrap).set({
+          margin:0, filename:'recibo.pdf',
+          html2canvas:{scale:2, useCORS:true},
+          jsPDF:{unit:'pt',format:'letter'},
+          pagebreak:{mode:['avoid-all','css','legacy']}
+        }).outputPdf('datauristring').then(function(uri){
+          limpiarYResolver(uri.split(',')[1]);
+        }).catch(function(){ limpiarYResolver(null); });
+      }catch(e){ limpiarYResolver(null); }
+    },400);
+    setTimeout(function(){ limpiarYResolver(null); },12000);
+  });
+}
+
+// Correo 4 (antes Correo 3) — confirmación de pago recibido al cliente, con
+// el recibo en PDF adjunto. Se dispara automáticamente al marcar una
+// cotización como Pagada (ver confirmarMetodoPago).
+async function enviarCorreoPagoRecibido(q){
+  if(!q || !q.cliente_email) return;
+  try{
+    var construido=construirHTMLReciboPDF(q.id);
+    var resumenTexto=construido?construido.resumenTexto:'';
+    var reciboBase64=await generarReciboPDFBase64(q.id);
+    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer '+SUPABASE_KEY
+      },
+      body:JSON.stringify({
+        tipo:'pago_recibido_cliente',
+        numCot:q.numero_cot,
+        cliente:{ nombre:nombreCliente(q), email:q.cliente_email, direccion:q.cliente_direccion||'' },
+        servicios:resumenTexto,
+        total:q.total||0,
+        metodoPago:q.metodo_pago||'',
+        pdfBase64:reciboBase64
+      })
+    });
+  } catch(e){ console.warn('No se pudo enviar el correo de pago recibido:', e); }
+}
+
+function construirHTMLReciboPDF(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
-  if(!q) return;
+  if(!q) return null;
   var rows=document.querySelectorAll('[id^="price-'+id+'-"]');
   var subtotal=0;
   rows.forEach(function(r){ subtotal+=parseFloat(r.value)||0; });
@@ -2859,8 +2947,18 @@ function generarReciboPago(id){
 
   h+='</body></html>';
 
-  var win=window.open('','_blank');
-  if(win){ win.document.write(h); win.document.close(); setTimeout(function(){win.print();},400); }
+  var resumenTexto='';
+  ordenServicios.forEach(function(svcName){
+    var itemsSvc=gruposPorServicio[svcName];
+    var subtotalSvc=itemsSvc.reduce(function(a,it){return a+it.precio;},0);
+    resumenTexto+=svcName+' — $'+subtotalSvc.toFixed(2)+'\n';
+  });
+  resumenTexto+='\nSubtotal: $'+subtotal.toFixed(2);
+  if(desc>0) resumenTexto+='\nDescuento: -$'+desc.toFixed(2);
+  if(aplicaItbms) resumenTexto+='\nITBMS (7%): $'+itbms.toFixed(2);
+  resumenTexto+='\nTOTAL PAGADO: $'+total.toFixed(2);
+
+  return {html:h, total:total, subtotal:subtotal, resumenTexto:resumenTexto};
 }
 
 // ===================== PRECIOS BASE =====================
