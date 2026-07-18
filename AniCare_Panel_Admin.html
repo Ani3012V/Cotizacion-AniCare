@@ -303,6 +303,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
     <button class="tab-btn active" id="tabCot" onclick="cambiarTab('cotizaciones')">📋 Cotizaciones</button>
     <button class="tab-btn" id="tabPrecios" onclick="cambiarTab('precios')">💲 Gestión de Precios</button>
     <button class="tab-btn" id="tabRecibos" onclick="abrirModalRecibos()">🧾 Recibos de Pago</button>
+    <button class="tab-btn" id="tabReglasCal" onclick="abrirModalReglasCalendarizacion()">🗓️ Reglas de Calendarización</button>
     <button class="tab-btn" id="tabDirectorio" onclick="cambiarTab('directorio')">📇 Directorio</button>
     <button class="tab-btn" id="tabIndicaciones" onclick="cambiarTab('indicaciones')">📖 Indicaciones</button>
   </div>
@@ -439,6 +440,58 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
   </div>
 </div>
 
+<div class="modal-overlay" id="modalReglasCal">
+  <div class="modal-box" style="max-width:640px;max-height:85vh;overflow-y:auto">
+    <h3>🗓️ Reglas de Calendarización</h3>
+    <p style="font-size:11.5px;color:#94A3B8;margin-bottom:14px">Estos valores alimentan el motor de calendarización (cálculo de duración de servicios y disponibilidad por día). Ajústalos si cambia el ritmo real de trabajo del equipo.</p>
+
+    <div style="font-size:12.5px;font-weight:800;color:#1B4332;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Duración por servicio</div>
+    <div id="reglasCalTablaBody" style="margin-bottom:18px"><div class="loading">Cargando…</div></div>
+
+    <div style="font-size:12.5px;font-weight:800;color:#1B4332;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Configuración general</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:6px">
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Máx. clientes/día</label>
+        <input type="number" id="cfgMaxClientesDia" min="1" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Margen traslado (min)</label>
+        <input type="number" id="cfgMargenTraslado" min="0" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Lun–Vie inicio</label>
+        <input type="time" id="cfgLunVieInicio" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Lun–Vie fin</label>
+        <input type="time" id="cfgLunVieFin" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Sábado inicio</label>
+        <input type="time" id="cfgSabInicio" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Sábado fin</label>
+        <input type="time" id="cfgSabFin" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Alerta ocupación desde (%)</label>
+        <input type="number" id="cfgAlertaMin" min="0" max="100" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#4a5568;margin-bottom:3px">Alerta ocupación hasta (%)</label>
+        <input type="number" id="cfgAlertaMax" min="0" max="100" style="width:100%;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px">
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#4a5568;margin:8px 0 14px"><input type="checkbox" id="cfgDomingoCerrado"> Domingo cerrado</label>
+
+    <div class="modal-btns">
+      <button class="btn-modal-cancelar" onclick="cerrarModalReglasCalendarizacion()">Cancelar</button>
+      <button class="btn-modal-confirmar" onclick="guardarReglasCalendarizacion()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalMetodoPago">
   <div class="modal-box">
     <h3>💰 ¿Cómo pagó el cliente?</h3>
@@ -555,8 +608,194 @@ window.onload=async function(){
     document.getElementById('adminApp').style.display='block';
     cargarCotizaciones();
     cargarModoSistema();
+    cargarReglasCalendarizacion();
   }
 };
+
+// ===================== MOTOR DE CALENDARIZACIÓN =====================
+// Reglas de duración por servicio + configuración general (horarios, máx
+// clientes/día, margen de traslado, umbral de alerta de ocupación). Se cargan
+// una vez al iniciar sesión y quedan en caché en memoria; se recargan solo
+// cuando Ani las edita y guarda desde el modal "Reglas de Calendarización".
+var REGLAS_CALENDARIZACION={}; // servicio_key -> {minutos_base, unidad_calculo, nombre}
+var CONFIG_CALENDARIZACION=null;
+
+async function cargarReglasCalendarizacion(){
+  try{
+    var s=getSupa();
+    var [rReglas,rConfig]=await Promise.all([
+      s.from('reglas_calendarizacion').select('*').order('id'),
+      s.from('config_calendarizacion').select('*').eq('id',1).single()
+    ]);
+    if(rReglas.error) throw rReglas.error;
+    if(rConfig.error) throw rConfig.error;
+    REGLAS_CALENDARIZACION={};
+    (rReglas.data||[]).forEach(function(r){ REGLAS_CALENDARIZACION[r.servicio_key]=r; });
+    CONFIG_CALENDARIZACION=rConfig.data||null;
+  } catch(e){
+    // Si las tablas todavía no existen o hay un error de red, el resto del
+    // Panel Admin sigue funcionando normal — solo el motor de calendarización
+    // queda inactivo (evaluarCapacidadDia siempre dirá "disponible" sin reglas).
+    console.warn('No se pudieron cargar las reglas de calendarización:',e);
+  }
+}
+
+// Minutos estimados que toma UN ítem de servicio, según su tipo y tamaño/cantidad.
+function calcularMinutosItem(item, svcKey){
+  var regla=REGLAS_CALENDARIZACION[svcKey];
+  if(!regla) return 0;
+  var cant=parseFloat(item.cant)||1;
+  if(regla.unidad_calculo==='m2'){
+    var areaM2=parseFloat(item.area||'0');
+    if(!areaM2 && item.medidas){
+      var m=String(item.medidas).match(/(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*cm/i);
+      if(m) areaM2=(parseFloat(m[1])/100)*(parseFloat(m[2])/100);
+    }
+    if(!areaM2) areaM2=1; // sin dato de área — se asume 1 m² para no subestimar a 0
+    return regla.minutos_base*areaM2*cant;
+  }
+  if(regla.unidad_calculo==='puesto'){
+    var puestosTxt=typeof formatearPuestos==='function'?formatearPuestos(item.puestos||''):'';
+    var puestosNum=parseInt(puestosTxt)||3; // sin dato — se asume un sofá de 3 puestos
+    return regla.minutos_base*puestosNum*cant;
+  }
+  // 'unidad' — minutos fijos por ítem (colchón, persiana, alfombra, electro, etc.)
+  return regla.minutos_base*cant;
+}
+
+// Minutos totales estimados para TODA una cotización (todos sus servicios).
+function calcularDuracionCotizacion(servicios){
+  var total=0;
+  (servicios||[]).forEach(function(item){
+    if(typeof item!=='object') return; // formato antiguo (texto) — no se puede estimar, se ignora
+    total+=calcularMinutosItem(item, item.svc||'otros');
+  });
+  return Math.round(total);
+}
+
+function minutosEntreHoras(horaIni,horaFin){
+  var a=String(horaIni).split(':').map(Number);
+  var b=String(horaFin).split(':').map(Number);
+  return (b[0]*60+(b[1]||0))-(a[0]*60+(a[1]||0));
+}
+
+// Evalúa si una fecha tiene capacidad para una cotización nueva de
+// `minutosNecesarios` de duración. Devuelve disponibilidad, % de ocupación
+// resultante y si debe mostrarse la alerta visual (75-80% por defecto).
+// `idExcluir` permite re-evaluar una cotización que ya está agendada ese día
+// sin contarla dos veces contra sí misma.
+function evaluarCapacidadDia(fechaISO, minutosNecesarios, idExcluir){
+  if(!CONFIG_CALENDARIZACION){
+    return {disponible:true, ocupacionPct:0, alerta:false, motivo:'Reglas de calendarización no cargadas — sin restricción aplicada'};
+  }
+  var cfg=CONFIG_CALENDARIZACION;
+  var diaSemana=new Date(fechaISO+'T00:00:00').getDay(); // 0=domingo … 6=sábado
+
+  if(diaSemana===0 && cfg.domingo_cerrado){
+    return {disponible:false, ocupacionPct:100, alerta:true, motivo:'Domingo — cerrado'};
+  }
+
+  var horaIni=diaSemana===6?cfg.sab_inicio:cfg.lunvie_inicio;
+  var horaFin=diaSemana===6?cfg.sab_fin:cfg.lunvie_fin;
+  var minutosDisponiblesDia=minutosEntreHoras(horaIni,horaFin);
+
+  var reservasDia=(todasCotizaciones||[]).filter(function(q){
+    return q.fecha_servicio===fechaISO && q.id!==idExcluir && (q.estado==='aprobada'||q.estado==='pagada');
+  });
+
+  if(reservasDia.length>=cfg.max_clientes_dia){
+    return {disponible:false, ocupacionPct:100, alerta:true, motivo:'Ya hay '+cfg.max_clientes_dia+' cliente(s) agendado(s) ese día'};
+  }
+
+  var minutosOcupados=reservasDia.reduce(function(acc,q){
+    return acc+calcularDuracionCotizacion(q.servicios)+cfg.margen_traslado_min;
+  },0);
+
+  var minutosTotal=minutosOcupados+minutosNecesarios;
+  var ocupacionPct=minutosDisponiblesDia>0?Math.round((minutosTotal/minutosDisponiblesDia)*100):100;
+
+  if(minutosTotal>minutosDisponiblesDia){
+    return {disponible:false, ocupacionPct:ocupacionPct, alerta:true, motivo:'No caben las horas necesarias en el horario disponible ese día'};
+  }
+
+  return {
+    disponible:true,
+    ocupacionPct:ocupacionPct,
+    alerta:ocupacionPct>=cfg.alerta_ocupacion_min_pct,
+    minutosDisponiblesDia:minutosDisponiblesDia,
+    minutosOcupados:minutosOcupados,
+    minutosNecesarios:minutosNecesarios
+  };
+}
+
+// ── Modal "Reglas de Calendarización" ──
+function abrirModalReglasCalendarizacion(){
+  document.getElementById('modalReglasCal').classList.add('show');
+  renderReglasCalTabla();
+  var cfg=CONFIG_CALENDARIZACION;
+  if(cfg){
+    document.getElementById('cfgMaxClientesDia').value=cfg.max_clientes_dia;
+    document.getElementById('cfgMargenTraslado').value=cfg.margen_traslado_min;
+    document.getElementById('cfgLunVieInicio').value=(cfg.lunvie_inicio||'').slice(0,5);
+    document.getElementById('cfgLunVieFin').value=(cfg.lunvie_fin||'').slice(0,5);
+    document.getElementById('cfgSabInicio').value=(cfg.sab_inicio||'').slice(0,5);
+    document.getElementById('cfgSabFin').value=(cfg.sab_fin||'').slice(0,5);
+    document.getElementById('cfgAlertaMin').value=cfg.alerta_ocupacion_min_pct;
+    document.getElementById('cfgAlertaMax').value=cfg.alerta_ocupacion_max_pct;
+    document.getElementById('cfgDomingoCerrado').checked=!!cfg.domingo_cerrado;
+  }
+}
+function cerrarModalReglasCalendarizacion(){
+  document.getElementById('modalReglasCal').classList.remove('show');
+}
+function renderReglasCalTabla(){
+  var body=document.getElementById('reglasCalTablaBody');
+  var keys=Object.keys(REGLAS_CALENDARIZACION);
+  if(keys.length===0){ body.innerHTML='<p style="font-size:12px;color:#DC2626">No se pudieron cargar las reglas — revisa que las tablas existan en Supabase.</p>'; return; }
+  var UNIDAD_LBL={m2:'min / m²', unidad:'min / unidad', puesto:'min / puesto'};
+  var h='';
+  keys.forEach(function(key){
+    var r=REGLAS_CALENDARIZACION[key];
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F1F5F4">';
+    h+='<div style="flex:1;font-size:12px;color:#1B2838">'+r.nombre+'</div>';
+    h+='<input type="number" step="0.5" min="0" id="reglaCal-'+key+'" value="'+r.minutos_base+'" style="width:70px;padding:6px;border:1.5px solid #e2e8f0;border-radius:8px;text-align:right">';
+    h+='<div style="width:90px;font-size:10.5px;color:#94A3B8">'+(UNIDAD_LBL[r.unidad_calculo]||r.unidad_calculo)+'</div>';
+    h+='</div>';
+  });
+  body.innerHTML=h;
+}
+async function guardarReglasCalendarizacion(){
+  try{
+    var s=getSupa();
+    var keys=Object.keys(REGLAS_CALENDARIZACION);
+    var updates=keys.map(function(key){
+      var input=document.getElementById('reglaCal-'+key);
+      var val=parseFloat(input.value);
+      return {servicio_key:key, minutos_base:isNaN(val)?REGLAS_CALENDARIZACION[key].minutos_base:val};
+    });
+    for(var i=0;i<updates.length;i++){
+      var {error}=await s.from('reglas_calendarizacion').update({minutos_base:updates[i].minutos_base,actualizado:new Date().toISOString()}).eq('servicio_key',updates[i].servicio_key);
+      if(error) throw error;
+    }
+    var cfgUpdate={
+      max_clientes_dia:parseInt(document.getElementById('cfgMaxClientesDia').value)||CONFIG_CALENDARIZACION.max_clientes_dia,
+      margen_traslado_min:parseInt(document.getElementById('cfgMargenTraslado').value)||CONFIG_CALENDARIZACION.margen_traslado_min,
+      lunvie_inicio:document.getElementById('cfgLunVieInicio').value||CONFIG_CALENDARIZACION.lunvie_inicio,
+      lunvie_fin:document.getElementById('cfgLunVieFin').value||CONFIG_CALENDARIZACION.lunvie_fin,
+      sab_inicio:document.getElementById('cfgSabInicio').value||CONFIG_CALENDARIZACION.sab_inicio,
+      sab_fin:document.getElementById('cfgSabFin').value||CONFIG_CALENDARIZACION.sab_fin,
+      alerta_ocupacion_min_pct:parseInt(document.getElementById('cfgAlertaMin').value)||CONFIG_CALENDARIZACION.alerta_ocupacion_min_pct,
+      alerta_ocupacion_max_pct:parseInt(document.getElementById('cfgAlertaMax').value)||CONFIG_CALENDARIZACION.alerta_ocupacion_max_pct,
+      domingo_cerrado:document.getElementById('cfgDomingoCerrado').checked,
+      actualizado:new Date().toISOString()
+    };
+    var {error:e2}=await s.from('config_calendarizacion').update(cfgUpdate).eq('id',1);
+    if(e2) throw e2;
+    toast('✅ Reglas de calendarización guardadas');
+    await cargarReglasCalendarizacion();
+    cerrarModalReglasCalendarizacion();
+  } catch(e){ toast('❌ Error al guardar: '+e.message); }
+}
 
 // ===================== MODO DEL SISTEMA (Verificación / Automático) =====================
 // Ahora mismo esto solo guarda y muestra la preferencia — todavía no cambia el
