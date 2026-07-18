@@ -2621,6 +2621,14 @@ async function guardarPrecios(id){
 
   try{
     var s=getSupa();
+    // Duración estimada (minutos) para el motor de calendarización — se calcula
+    // aquí, en cuanto se conocen los servicios reales de la cotización, y se
+    // guarda junto con el precio. La pantalla pública de confirmación de hora
+    // (Aprobar_Cotizacion.html) usa este número ya calculado, sin tener que
+    // repetir la lógica de reglas del lado del cliente.
+    var qParaDuracion=todasCotizaciones.find(function(x){return x.id===id;});
+    var duracionMin=qParaDuracion?calcularDuracionCotizacion(qParaDuracion.servicios):null;
+
     var {error}=await s.from('cotizaciones').update({
       precios_detalle:precios,
       subtotal:subtotal,
@@ -2629,7 +2637,8 @@ async function guardarPrecios(id){
       itbms:itbms,
       total:total,
       estado:'cotizado',
-      fecha_cotizado:new Date().toISOString()
+      fecha_cotizado:new Date().toISOString(),
+      duracion_estimada_min:duracionMin
     }).eq('id',id);
     if(error) throw error;
 
@@ -2641,7 +2650,7 @@ async function guardarPrecios(id){
     toast('✅ Precios guardados correctamente (solo en esta cotización)');
     // Update local cache
     var q=todasCotizaciones.find(function(x){return x.id===id;});
-    if(q){ q.precios_detalle=precios; q.subtotal=subtotal; q.descuento=desc; q.aplica_itbms=aplicaItbms; q.itbms=itbms; q.total=total; q.estado='cotizado'; }
+    if(q){ q.precios_detalle=precios; q.subtotal=subtotal; q.descuento=desc; q.aplica_itbms=aplicaItbms; q.itbms=itbms; q.total=total; q.estado='cotizado'; q.duracion_estimada_min=duracionMin; }
     revisarPendientesVencidos(); // recalcula la alerta de +12h ya que este quote salió de Pendientes
 
     // Cambia automáticamente al filtro "Esperando Respuesta" para que la
