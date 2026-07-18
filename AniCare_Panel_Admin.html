@@ -1359,6 +1359,33 @@ async function modificarCotizacion(id){
   } catch(e){ toast('❌ Error: '+e.message); }
 }
 
+// Correo 3 (nuevo) — confirmación al CLIENTE de que su servicio quedó aprobado,
+// con la fecha destacada y un botón para agendarlo en su calendario (+ adjunto
+// .ics). Se usa tanto cuando el cliente aprueba desde el link (Aprobar_Cotizacion.html)
+// como cuando Ani lo marca manualmente aquí (ej. cliente confirmó por llamada).
+async function enviarCorreoAprobacionCliente(q){
+  if(!q || !q.cliente_email) return;
+  try{
+    var construido=construirHTMLCotizacionPDF(q.id);
+    var resumenTexto = construido ? construido.resumenTexto : '';
+    await fetch('https://tsajcvsgnxxnmhubrxmr.supabase.co/functions/v1/enviar-email',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer '+SUPABASE_KEY
+      },
+      body:JSON.stringify({
+        tipo:'cotizacion_aprobada_cliente',
+        numCot:q.numero_cot,
+        cliente:{ nombre:nombreCliente(q), email:q.cliente_email, direccion:q.cliente_direccion||'' },
+        servicios:resumenTexto,
+        fecha:q.fecha_servicio||''
+      })
+    });
+  } catch(e){ console.warn('No se pudo enviar el correo de confirmación al cliente:', e); }
+}
+
 async function marcarAprobada(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return;
@@ -1372,6 +1399,7 @@ async function marcarAprobada(id){
     var {error}=await s.from('cotizaciones').update({estado:'aprobada',fecha_aprobada:new Date().toISOString(),aprobacion_pendiente:false}).eq('id',id);
     if(error) throw error;
     q.estado='aprobada'; q.fecha_aprobada=new Date().toISOString(); q.aprobacion_pendiente=false;
+    enviarCorreoAprobacionCliente(q); // Correo 3 (nuevo)
     toast('✅ Cotización marcada como Aprobada');
     var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
     if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
@@ -2247,6 +2275,7 @@ async function enviarLinkAprobacion(id){
       var {error}=await s.from('cotizaciones').update({enviado_cliente:true,estado:'aprobada',fecha_aprobada:new Date().toISOString(),aprobacion_pendiente:false}).eq('id',id);
       if(error) throw error;
       q.enviado_cliente=true; q.estado='aprobada'; q.fecha_aprobada=new Date().toISOString(); q.aprobacion_pendiente=false;
+      enviarCorreoAprobacionCliente(q); // Correo 3 (nuevo)
       toast('✅ Enviado y Aprobado — movido a Aprobadas');
       var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
       if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
