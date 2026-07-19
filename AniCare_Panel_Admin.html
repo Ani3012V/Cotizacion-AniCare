@@ -3022,7 +3022,13 @@ function construirHTMLCotizacionPDF(id){
   if(q.cliente_direccion) h+='<div class="client-item"><b>Dirección:</b> '+esc(q.cliente_direccion)+'</div>';
   if(q.cliente_email) h+='<div class="client-item"><b>Correo:</b> '+esc(q.cliente_email)+'</div>';
   if(q.cliente_corregimiento) h+='<div class="client-item"><b>Corregimiento:</b> '+esc(q.cliente_corregimiento)+'</div>';
-  if(q.fecha_servicio) h+='<div class="client-item" style="grid-column:1/-1"><div style="display:inline-flex;align-items:center;gap:6px;background:#FEF3E2;border:1.5px solid #B45309;border-radius:8px;padding:6px 12px;margin-top:2px"><span style="font-size:13px">📅</span><b style="color:#78350F">Fecha autorizada del Servicio:</b> <span style="font-weight:800;color:#1B2838">'+esc(formatearFechaDDMM(q.fecha_servicio))+'</span></div></div>';
+  // BUG CORREGIDO (19-jul-2026): esta caja aparecía vacía (solo el borde/fondo,
+  // sin texto) en cotizaciones que aún no llegan a Aprobada — html2canvas no
+  // siempre pinta bien el contenido de un display:inline-flex con emoji al
+  // convertir a PDF. Se restringe a solo Aprobada/Pagada (única etapa en la que
+  // fecha_servicio debería existir de verdad) y se cambia a un div normal (sin
+  // inline-flex) para que html2canvas lo capture de forma confiable.
+  if(q.fecha_servicio && (q.estado==='aprobada'||q.estado==='pagada')) h+='<div class="client-item" style="grid-column:1/-1"><div style="background:#FEF3E2;border:1.5px solid #B45309;border-radius:8px;padding:6px 12px;margin-top:2px"><span style="font-size:13px">📅 </span><b style="color:#78350F">Fecha autorizada del Servicio:</b> <span style="font-weight:800;color:#1B2838">'+esc(formatearFechaDDMM(q.fecha_servicio))+'</span></div></div>';
   h+='</div>';
   if(q.metodo_pago) h+='<div class="pago-row"><b>Método de pago:</b> '+esc(q.metodo_pago)+'</div>';
 
