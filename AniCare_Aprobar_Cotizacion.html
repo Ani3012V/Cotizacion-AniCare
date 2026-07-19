@@ -8,52 +8,61 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{background:white;border-radius:20px;max-width:420px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.1);overflow:hidden}
-.header{background:linear-gradient(135deg,#40916C,#52B788);padding:22px 24px;text-align:center}
-.header h1{color:white;font-size:16px;font-weight:900}
-.header p{color:rgba(255,255,255,.85);font-size:12px;margin-top:4px}
-.body{padding:24px}
-.loading{text-align:center;padding:40px 20px;color:#718096;font-size:13px}
-.spinner{width:32px;height:32px;border:3px solid #D8F3DC;border-top-color:#40916C;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px}
+.card{background:white;border-radius:22px;max-width:520px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.1);overflow:hidden}
+.header{background:linear-gradient(135deg,#40916C,#52B788);padding:26px 28px;text-align:center}
+.header h1{color:white;font-size:19px;font-weight:900}
+.header p{color:rgba(255,255,255,.85);font-size:14px;margin-top:5px}
+.body{padding:30px}
+.loading{text-align:center;padding:46px 20px;color:#718096;font-size:15px}
+.spinner{width:36px;height:36px;border:3px solid #D8F3DC;border-top-color:#40916C;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.q-num{font-size:12px;font-weight:800;color:#40916C;background:#F0FAF4;border-radius:8px;padding:6px 12px;display:inline-block;margin-bottom:14px}
-.q-client{font-size:15px;font-weight:800;color:#1B4332;margin-bottom:16px}
-.svc-block{margin-bottom:14px}
-.svc-name{font-size:11px;font-weight:800;color:#2D6A4F;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
-.svc-item{font-size:13px;color:#4a5568;padding:4px 0;border-bottom:1px solid #f0f2f5;line-height:1.5}
+.q-num{font-size:14px;font-weight:800;color:#40916C;background:#F0FAF4;border-radius:9px;padding:7px 14px;display:inline-block;margin-bottom:16px}
+.q-client{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:18px}
+.svc-block{margin-bottom:16px}
+.svc-name{font-size:13px;font-weight:800;color:#2D6A4F;text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px}
+.svc-item{font-size:15px;color:#4a5568;padding:5px 0;border-bottom:1px solid #f0f2f5;line-height:1.55}
 
-.totals{background:#F0FAF4;border-radius:12px;padding:14px 16px;margin-top:16px}
-.t-row{display:flex;justify-content:space-between;font-size:13px;color:#2D6A4F;padding:3px 0}
-.t-row.final{font-size:20px;font-weight:900;color:#1B4332;border-top:2px solid #D8F3DC;margin-top:6px;padding-top:8px}
+.totals{background:#F0FAF4;border-radius:13px;padding:16px 18px;margin-top:18px}
+.t-row{display:flex;justify-content:space-between;font-size:15px;color:#2D6A4F;padding:4px 0}
+.t-row.final{font-size:23px;font-weight:900;color:#1B4332;border-top:2px solid #D8F3DC;margin-top:7px;padding-top:9px}
 
-.btns{display:flex;flex-direction:column;gap:10px;margin-top:20px}
-.btn-aprobar{background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer}
-.btn-cancelar{background:none;border:1.5px solid #FCA5A5;color:#DC2626;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer}
+.btns{display:flex;flex-direction:column;gap:11px;margin-top:22px}
+.btn-aprobar{background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:13px;padding:17px;font-size:17px;font-weight:700;cursor:pointer}
+.btn-cancelar{background:none;border:1.5px solid #FCA5A5;color:#DC2626;border-radius:13px;padding:15px;font-size:15.5px;font-weight:700;cursor:pointer}
 
-.motivo-box{display:none;margin-top:12px;background:#FFF5F5;border:1.5px solid #FED7D7;border-radius:10px;padding:12px}
-.motivo-box select{width:100%;border:1.5px solid #FCA5A5;border-radius:8px;padding:9px;font-size:13px;margin-bottom:8px}
-.motivo-box textarea{width:100%;border:1.5px solid #FCA5A5;border-radius:8px;padding:9px;font-size:13px;display:none;resize:vertical;min-height:60px;margin-bottom:8px}
-.btn-confirmar-cancel{width:100%;background:#DC2626;color:white;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer}
+.motivo-box{display:none;margin-top:13px;background:#FFF5F5;border:1.5px solid #FED7D7;border-radius:11px;padding:14px}
+.motivo-box select{width:100%;border:1.5px solid #FCA5A5;border-radius:9px;padding:11px;font-size:14.5px;margin-bottom:9px}
+.motivo-box textarea{width:100%;border:1.5px solid #FCA5A5;border-radius:9px;padding:11px;font-size:14.5px;display:none;resize:vertical;min-height:65px;margin-bottom:9px}
+.btn-confirmar-cancel{width:100%;background:#DC2626;color:white;border:none;border-radius:11px;padding:13px;font-size:14.5px;font-weight:700;cursor:pointer}
 
-.result-screen{text-align:center;padding:20px}
-.result-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:36px;color:white}
+.result-screen{text-align:center;padding:24px}
+.result-icon{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:40px;color:white}
 .result-icon.ok{background:linear-gradient(135deg,#40916C,#52B788)}
 .result-icon.cancel{background:linear-gradient(135deg,#DC2626,#EF4444)}
-.result-title{font-size:18px;font-weight:900;color:#1B4332;margin-bottom:8px}
-.result-msg{font-size:13px;color:#718096;line-height:1.6}
+.result-title{font-size:21px;font-weight:900;color:#1B4332;margin-bottom:10px}
+.result-msg{font-size:15px;color:#4a5568;line-height:1.65}
+.result-note{font-size:13px;color:#B45309;background:#FFF8E1;border:1.5px solid #F0B75A;border-radius:10px;padding:11px 14px;margin-top:16px;line-height:1.55;text-align:left}
 
-.error-box{text-align:center;padding:30px 20px;color:#991B1B;font-size:13px;line-height:1.6}
-.footer-note{text-align:center;font-size:10.5px;color:#a0aec0;margin-top:18px}
+.error-box{text-align:center;padding:34px 22px;color:#991B1B;font-size:15px;line-height:1.65}
+.footer-note{text-align:center;font-size:12px;color:#a0aec0;margin-top:20px}
 
-.fecha-title{font-size:15px;font-weight:800;color:#1B4332;margin-bottom:6px;text-align:center}
-.fecha-sub{font-size:12.5px;color:#718096;text-align:center;margin-bottom:18px;line-height:1.5}
-.fecha-opcion{display:block;width:100%;text-align:left;background:#F0FAF4;border:1.5px solid #D8F3DC;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-family:inherit}
-.fecha-opcion:hover{border-color:#40916C}
-.fecha-opcion .d1{font-size:14px;font-weight:800;color:#1B4332;text-transform:capitalize}
-.fecha-opcion .d2{font-size:11.5px;color:#718096;margin-top:2px}
-.fecha-opcion.alerta{background:#FEF3E2;border-color:#F0B75A}
-.fecha-opcion.alerta .d2{color:#B45309}
+.fecha-title{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:7px;text-align:center}
+.fecha-sub{font-size:14px;color:#718096;text-align:center;margin-bottom:18px;line-height:1.55}
+
+.cal-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
+.cal-day{border-radius:12px;padding:11px 4px;text-align:center;border:1.5px solid transparent;font-family:inherit;background:none}
+.cal-day .dow{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;opacity:.85}
+.cal-day .num{font-size:19px;font-weight:900;margin-top:3px;line-height:1.1}
+.cal-day .mes{font-size:9px;font-weight:600;opacity:.75;margin-top:1px}
+.cal-day.libre{background:#F0FAF4;border-color:#95D5B2;color:#1B4332;cursor:pointer;transition:transform .12s,border-color .12s}
+.cal-day.libre:hover{border-color:#40916C;transform:translateY(-2px)}
+.cal-day.alerta{background:#FEF3E2;border-color:#F0B75A;color:#78350F;cursor:pointer;transition:transform .12s,border-color .12s}
+.cal-day.alerta:hover{border-color:#D97706;transform:translateY(-2px)}
+.cal-day.ocupado{background:#F1F3F5;color:#A0AEC0;cursor:not-allowed}
+.cal-leyenda{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:2px 0 20px;font-size:12px;color:#718096}
+.cal-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.cal-dot{width:11px;height:11px;border-radius:50%;display:inline-block}
 </style>
 </head>
 <body>
@@ -335,7 +344,8 @@ async function mostrarSeleccionFecha(){
 
     var hoy = new Date();
     var desde = new Date(hoy); desde.setDate(desde.getDate()+1); // desde mañana
-    var hasta = new Date(hoy); hasta.setDate(hasta.getDate()+21); // ventana de búsqueda de 3 semanas
+    var DIAS_VENTANA = 15; // calendario tipo aerolínea: 15 días para elegir
+    var hasta = new Date(desde); hasta.setDate(hasta.getDate()+DIAS_VENTANA-1);
     var fmtISO = function(d){ return d.toISOString().slice(0,10); };
 
     var {data:reservas, error:eRes} = await sb.rpc('obtener_disponibilidad_publica', {p_desde:fmtISO(desde), p_hasta:fmtISO(hasta)});
@@ -343,32 +353,48 @@ async function mostrarSeleccionFecha(){
     var reservasPorFecha = {};
     (reservas||[]).forEach(function(r){ reservasPorFecha[r.fecha] = r; });
 
-    var opciones = [];
+    // A diferencia de antes (que buscaba los primeros 3 días libres y se
+    // detenía ahí), ahora se evalúan los 15 días de la ventana completa —
+    // los ocupados/cerrados también se muestran, solo que en gris y sin poder
+    // seleccionarlos, como en un calendario de vuelos.
+    var dias = [];
     var cursor = new Date(desde);
-    while(opciones.length<3 && cursor<=hasta){
+    var hayAlgunoLibre = false;
+    for(var i=0;i<DIAS_VENTANA;i++){
       var fechaISO = fmtISO(cursor);
       var diaSemana = cursor.getDay(); // 0=domingo … 6=sábado
       var cfg = CONFIG_CAL_PUBLICO;
-      var esValido = true, motivo='';
+      var estado = 'libre';
 
-      if(diaSemana===0 && cfg.domingo_cerrado){ esValido=false; }
-      else{
+      if(diaSemana===0 && cfg.domingo_cerrado){
+        estado = 'ocupado';
+      } else {
         var horaIni = diaSemana===6 ? cfg.sab_inicio : cfg.lunvie_inicio;
         var horaFin = diaSemana===6 ? cfg.sab_fin : cfg.lunvie_fin;
         var minDisp = minutosEntreHoras(horaIni,horaFin);
         var reservaDia = reservasPorFecha[fechaISO] || {minutos_ocupados:0, cantidad_clientes:0};
         var minOcupados = Number(reservaDia.minutos_ocupados||0) + (reservaDia.cantidad_clientes>0 ? cfg.margen_traslado_min : 0);
         var minTotal = minOcupados + duracionMin;
-        if(reservaDia.cantidad_clientes>=cfg.max_clientes_dia || minTotal>minDisp) esValido=false;
-        else{
+        if(reservaDia.cantidad_clientes>=cfg.max_clientes_dia || minTotal>minDisp){
+          estado = 'ocupado';
+        } else {
           var ocupacionPct = minDisp>0 ? Math.round((minTotal/minDisp)*100) : 100;
-          opciones.push({fecha:fechaISO, dateObj:new Date(cursor), alerta: ocupacionPct>=cfg.alerta_ocupacion_min_pct});
+          estado = ocupacionPct>=cfg.alerta_ocupacion_min_pct ? 'alerta' : 'libre';
         }
       }
+      if(estado!=='ocupado') hayAlgunoLibre = true;
+      dias.push({fecha:fechaISO, dateObj:new Date(cursor), estado:estado});
       cursor.setDate(cursor.getDate()+1);
     }
 
-    renderSeleccionFecha(opciones);
+    if(!hayAlgunoLibre){
+      // Ni un solo día libre/con espacio en las 2 semanas — no se bloquea al
+      // cliente, se avisa y se sigue el flujo sin fecha confirmada (Ani la coordina a mano).
+      notificarSinFechaYContinuar();
+      return;
+    }
+
+    renderSeleccionFecha(dias);
   } catch(e){
     console.error('Error buscando disponibilidad:', e);
     // Si algo falla (tablas no cargadas, red, etc.), no se bloquea al cliente —
@@ -383,24 +409,68 @@ function minutosEntreHoras(horaIni,horaFin){
   return (b[0]*60+(b[1]||0))-(a[0]*60+(a[1]||0));
 }
 
-function renderSeleccionFecha(opciones){
+// Calendario tipo aerolínea: cuadrícula de 15 días, cada uno coloreado según
+// disponibilidad. Verde = día libre. Naranja = queda espacio pero ya comparte
+// el día con otro cliente (alta demanda). Gris = ocupado/cerrado, no se puede
+// seleccionar (el botón queda deshabilitado, no solo pintado distinto).
+function renderSeleccionFecha(dias){
   var body = document.getElementById('bodyContent');
-  if(opciones.length===0){
-    // No se encontró cupo en las próximas 3 semanas — no se bloquea al cliente,
-    // se avisa y se sigue el flujo sin fecha confirmada (Ani la coordina a mano).
-    notificarSinFechaYContinuar();
-    return;
-  }
   var h = '<div class="fecha-title">📅 Elige el día de tu servicio</div>';
-  h += '<div class="fecha-sub">Estas son las próximas fechas con disponibilidad para tu N° '+esc(quoteData.numero_cot)+'.</div>';
-  opciones.forEach(function(op,i){
-    var txt = op.dateObj.toLocaleDateString('es-PA',{weekday:'long',day:'2-digit',month:'long'});
-    h += '<button type="button" class="fecha-opcion'+(op.alerta?' alerta':'')+'" onclick="elegirFecha(\''+op.fecha+'\')">';
-    h += '<div class="d1">'+txt+'</div>';
-    h += '<div class="d2">'+(op.alerta?'⚠️ Día con alta demanda — igual disponible':'Disponible')+'</div>';
+  h += '<div class="fecha-sub">Estas son las próximas fechas para tu cotización N° '+esc(quoteData.numero_cot)+'. Toca un día disponible para confirmar tu servicio.</div>';
+
+  h += '<div class="cal-grid">';
+  dias.forEach(function(d){
+    var dow = d.dateObj.toLocaleDateString('es-PA',{weekday:'short'}).replace('.','');
+    var num = d.dateObj.getDate();
+    var mes = d.dateObj.toLocaleDateString('es-PA',{month:'short'}).replace('.','');
+    if(d.estado==='ocupado'){
+      h += '<button type="button" class="cal-day ocupado" disabled title="No disponible">';
+    } else {
+      h += '<button type="button" class="cal-day '+d.estado+'" onclick="elegirFecha(\''+d.fecha+'\')" title="'+(d.estado==='alerta'?'Disponible — comparte el día con otro servicio':'Disponible')+'">';
+    }
+    h += '<div class="dow">'+dow+'</div>';
+    h += '<div class="num">'+num+'</div>';
+    h += '<div class="mes">'+mes+'</div>';
     h += '</button>';
   });
+  h += '</div>';
+
+  h += '<div class="cal-leyenda">';
+  h += '<span><span class="cal-dot" style="background:#95D5B2"></span>Día libre</span>';
+  h += '<span><span class="cal-dot" style="background:#F0B75A"></span>Cupo compartido</span>';
+  h += '<span><span class="cal-dot" style="background:#CBD3DB"></span>No disponible</span>';
+  h += '</div>';
+
   body.innerHTML = h;
+}
+
+// Crea el evento en el Google Calendar de AniCare (una sola vía: la app crea
+// el evento, nunca lee el calendario). Si falla, no bloquea al cliente — el
+// Correo 3 y la confirmación siguen su curso igual.
+async function crearEventoCalendar(){
+  if(!quoteData || !quoteData.fecha_servicio) return;
+  try{
+    await fetch(SUPA_URL+'/functions/v1/crear-evento-calendar', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer '+SUPA_KEY
+      },
+      body: JSON.stringify({
+        numCot:quoteData.numero_cot,
+        cliente:{
+          nombre:quoteData.cliente_nombre,
+          direccion:quoteData.cliente_direccion||'',
+          telefono:quoteData.cliente_telefono||''
+        },
+        fecha:quoteData.fecha_servicio,
+        duracionMin:quoteData.duracion_estimada_min||null,
+        servicios:construirResumenServiciosTexto(),
+        total:(quoteData.total||0).toFixed(2)
+      })
+    });
+  } catch(e){ console.warn('No se pudo crear el evento en Google Calendar:', e); }
 }
 
 async function elegirFecha(fechaISO){
@@ -411,6 +481,7 @@ async function elegirFecha(fechaISO){
     if(error) throw error;
     quoteData.fecha_servicio = fechaISO;
     enviarCorreoAprobacionCliente(); // Correo 3 — ahora sí con la fecha ya confirmada
+    crearEventoCalendar(); // Evento en Google Calendar de AniCare
     mostrarResultado(true);
   } catch(e){
     console.error('Error confirmando fecha:', e);
@@ -453,10 +524,15 @@ async function confirmarCancelar(){
 function mostrarResultado(aprobado){
   var body = document.getElementById('bodyContent');
   if(aprobado){
+    var tieneFecha = !!quoteData.fecha_servicio;
+    var mensajePrincipal = tieneFecha
+      ? 'Nos pondremos en contacto contigo pronto. Nuestro técnico llegará en la fecha y hora solicitada — por favor esté pendiente ese día para su ingreso.'
+      : 'Nos pondremos en contacto contigo pronto para coordinar la fecha del servicio.';
     body.innerHTML = '<div class="result-screen">'+
       '<div class="result-icon ok">✓</div>'+
       '<div class="result-title">¡Gracias por confiar en nosotros!</div>'+
-      '<div class="result-msg">Hemos recibido tu aprobación para la cotización N° '+esc(quoteData.numero_cot)+'.<br><br>Nos pondremos en contacto contigo pronto para coordinar la fecha del servicio.</div>'+
+      '<div class="result-msg">Hemos recibido tu aprobación para la cotización N° '+esc(quoteData.numero_cot)+'.<br><br>'+mensajePrincipal+'</div>'+
+      '<div class="result-note">⏰ Cualquier cambio de fecha debe ser notificado con 24 horas de anticipación.</div>'+
       '<div class="footer-note">Cleaning Service & Ani Care · Panamá<br>WhatsApp: +507 6317-1227</div>'+
       '</div>';
   } else {

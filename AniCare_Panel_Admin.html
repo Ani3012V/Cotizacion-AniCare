@@ -3133,6 +3133,14 @@ function construirHTMLCotizacionPDF(id){
 // Electrónica (en Panamá eso requiere pasar por el SFEP/DGI con CUFE — ver
 // nota en la Bitácora). Esto es solo un comprobante interno de pago.
 function generarReciboPago(id){
+  // BUG CORREGIDO (19-jul-2026): al reimprimir un recibo desde una tarjeta que
+  // no estaba abierta/rendida en ese momento, los inputs de precio no existían
+  // en el DOM -- construirHTMLReciboPDF calculaba subtotal=0 y por lo tanto
+  // TOTAL PAGADO $0.00, aunque el precio real guardado en la base de datos
+  // fuera correcto. Se soluciona re-renderizando el contenido de la tarjeta
+  // (sin abrirla visualmente) antes de generar el recibo, igual que ya se hace
+  // en confirmarMetodoPago() y en enviarLinkAprobacion().
+  renderQuoteDetail(id);
   var r=construirHTMLReciboPDF(id);
   if(!r) return;
   var win=window.open('','_blank');
@@ -3146,6 +3154,7 @@ function generarReciboPago(id){
 // sobre por qué no se puede usar un iframe ni position:fixed/absolute).
 function generarReciboPDFBase64(id){
   return new Promise(function(resolve){
+    renderQuoteDetail(id); // misma red de seguridad que en generarReciboPago()
     var r=construirHTMLReciboPDF(id);
     if(!r || typeof html2pdf==='undefined'){ resolve(null); return; }
 
