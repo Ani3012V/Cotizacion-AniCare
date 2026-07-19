@@ -415,6 +415,38 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7">Es a propósito: como Hogar/Comercial/Pulido son 100% manuales, el sistema nunca le manda una cotización al cliente sin que tú la hayas revisado y confirmado primero.</p>
       </div>
 
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-top:16px">
+        <h3 style="color:#1B4332;font-size:14px;margin-bottom:10px">💬 Organizar WhatsApp Business con Etiquetas (para no mezclar cotizaciones con contactos personales)</h3>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">WhatsApp Business (a diferencia del WhatsApp normal) trae una función de <b>Etiquetas</b> que permite marcar cada chat según en qué parte del proceso está, sin necesidad de un número aparte ni de ninguna API de pago. La idea es que las etiquetas reflejen los mismos 4 estados que ya usas en la pestaña Cotizaciones.</p>
+
+        <p style="font-size:12.5px;color:#1B4332;font-weight:700;margin-bottom:6px">Cómo crear las etiquetas (una sola vez):</p>
+        <ol style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:12px">
+          <li>Abre WhatsApp Business en el celular.</li>
+          <li>Toca los <b>3 puntos</b> (arriba a la derecha) → <b>Herramientas para la empresa</b> → <b>Etiquetas</b>.</li>
+          <li>Toca <b>Crear etiqueta</b> y ponle nombre y color. Se recomienda crear estas 4, con los mismos nombres y colores que usas en Panel Admin:</li>
+        </ol>
+        <ul style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:12px">
+          <li>🟡 <b>Cotización Pendiente</b></li>
+          <li>🟠 <b>Esperando Respuesta</b></li>
+          <li>🟢 <b>Aprobada</b></li>
+          <li>🔵 <b>Pagada</b></li>
+        </ul>
+
+        <p style="font-size:12.5px;color:#1B4332;font-weight:700;margin-bottom:6px">Cómo aplicarlas (por cada cliente, según avanza):</p>
+        <ol style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:12px">
+          <li>Mantén presionado el chat del cliente en la lista → toca el ícono de <b>etiqueta</b> (o desliza el chat hacia la derecha, según tu versión).</li>
+          <li>Selecciona la etiqueta que corresponda a su estado actual. Un chat puede tener varias etiquetas, pero para este flujo basta con una a la vez.</li>
+          <li>Cuando la cotización cambie de estado en Panel Admin (ej. de Pendiente a Esperando Respuesta), actualiza también la etiqueta de ese chat — así ambos quedan sincronizados.</li>
+        </ol>
+
+        <p style="font-size:12.5px;color:#1B4332;font-weight:700;margin-bottom:6px">Cómo usarlas en el día a día:</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">En la lista de chats, toca el ícono de <b>filtro/embudo</b> (arriba) y selecciona una etiqueta para ver solo esas conversaciones — por ejemplo, filtra por "Esperando Respuesta" para revisar de un vistazo a quién le falta contestar, sin que se mezclen tus contactos personales ni otros temas.</p>
+
+        <div style="background:#FFF8E1;border-left:3px solid #F59E0B;border-radius:0 8px 8px 0;padding:10px 12px;font-size:11.5px;color:#78350F">
+          💡 Las etiquetas viven solo en tu celular/cuenta de WhatsApp Business — no se sincronizan automáticamente con el estado en Panel Admin, así que hay que actualizarlas a mano en los dos lugares. Si el volumen crece mucho, se puede evaluar más adelante una integración automática (ej. con Z-API u otro proveedor), pero por ahora esto no tiene costo y resuelve el orden.
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1711,7 +1743,6 @@ async function modificarCotizacion(id){
     var chipPendiente=document.querySelector('.filter-chip[data-estado="pendiente"]');
     if(chipPendiente) filtrarEstado(chipPendiente,'pendiente');
     else renderCotizaciones();
-    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
   } catch(e){ toast('❌ Error: '+e.message); }
 }
 
@@ -1759,7 +1790,6 @@ async function marcarAprobada(id){
     toast('✅ Cotización marcada como Aprobada');
     var chipAprobada=document.querySelector('.filter-chip[data-estado="aprobada"]');
     if(chipAprobada) filtrarEstado(chipAprobada,'aprobada'); else renderCotizaciones();
-    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
   } catch(e){ toast('❌ Error: '+e.message); }
 }
 
@@ -1989,7 +2019,12 @@ async function confirmarMetodoPago(){
     renderCotizaciones();
     setTimeout(function(){
       var card=document.getElementById('qcard-'+id);
-      if(card){card.classList.add('open'); renderQuoteDetail(id);}
+      // No se abre visualmente (sin 'open') para que la tarjeta se mantenga
+      // colapsada al pasar a Pagadas — pero renderQuoteDetail() sí se llama
+      // igual, porque el recibo necesita leer los inputs de precio del DOM
+      // aunque estén ocultos (la clase 'open' solo controla el CSS, no si
+      // el contenido existe en la página).
+      if(card){ renderQuoteDetail(id); }
       // El recibo se genera leyendo los precios ya en pantalla — se espera un
       // instante extra a que renderQuoteDetail termine de dibujar los inputs.
       setTimeout(function(){
@@ -2609,6 +2644,21 @@ function enviarFactura(id){
 async function enviarLinkAprobacion(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return;
+
+  // BUG CORREGIDO (18-jul-2026): cuando esta función se llama justo después de
+  // guardarPrecios() haber pasado la cotización de "pendiente" a "cotizado", ese
+  // mismo guardarPrecios() cambia el filtro visible a la pestaña "Cotizado" y
+  // redibuja la lista con la tarjeta COLAPSADA (a propósito, para no abrirla sola).
+  // Pero al redibujarse colapsada, el contenido interno (los inputs de precio,
+  // descuento, ITBMS) deja de existir en el DOM -- así que el siguiente
+  // guardarPrecios() de abajo, y sobre todo construirHTMLCotizacionPDF() dentro
+  // de enviarCorreoCotizacion(), no encontraban esos inputs, fallaban en
+  // silencio (try/catch solo con console.warn) y el correo se mandaba SIN el PDF
+  // adjunto y sin el detalle de precios en el cuerpo. Se soluciona re-renderizando
+  // el contenido de la tarjeta aquí (sin abrirla visualmente) antes de continuar,
+  // igual que ya se hacía en confirmarMetodoPago() para el recibo de pago.
+  renderQuoteDetail(id);
+
   // Misma red de seguridad que en marcarAprobada(): guarda el precio antes de enviar.
   if(q.estado==='cotizado') await guardarPrecios(id);
   if(!q.token_aprobacion){
@@ -2746,17 +2796,30 @@ async function guardarPrecios(id){
     var qParaDuracion=todasCotizaciones.find(function(x){return x.id===id;});
     var duracionMin=qParaDuracion?calcularDuracionCotizacion(qParaDuracion.servicios):null;
 
-    var {error}=await s.from('cotizaciones').update({
+    // BUG CORREGIDO (18-jul-2026): antes esta función SIEMPRE forzaba estado:'cotizado'
+    // sin importar en qué estado estuviera la cotización — eso significaba que ajustar
+    // un precio en una cotización ya Aprobada la regresaba silenciosamente a "Esperando
+    // Respuesta". Ahora el estado se preserva, EXCEPTO cuando viene de "pendiente": ese
+    // es el único caso en que SÍ debe avanzar a "cotizado", porque este mismo paso es
+    // el que usa guardarYEnviarCotizacion() como parte del clic manual "Enviar al
+    // Cliente" — nunca avanza sola, solo como parte de esa acción explícita.
+    var estadoActual=qParaDuracion?qParaDuracion.estado:null;
+    var estadoAGuardar=estadoActual==='pendiente'?'cotizado':estadoActual;
+    var updatePayload={
       precios_detalle:precios,
       subtotal:subtotal,
       descuento:desc,
       aplica_itbms:aplicaItbms,
       itbms:itbms,
       total:total,
-      estado:'cotizado',
-      fecha_cotizado:new Date().toISOString(),
       duracion_estimada_min:duracionMin
-    }).eq('id',id);
+    };
+    if(estadoAGuardar){
+      updatePayload.estado=estadoAGuardar;
+      if(estadoAGuardar==='cotizado' && estadoActual==='pendiente') updatePayload.fecha_cotizado=new Date().toISOString();
+    }
+
+    var {error}=await s.from('cotizaciones').update(updatePayload).eq('id',id);
     if(error) throw error;
 
     // IMPORTANTE: los precios de aquí NUNCA se graban como precio base del catálogo,
@@ -2767,17 +2830,19 @@ async function guardarPrecios(id){
     toast('✅ Precios guardados correctamente (solo en esta cotización)');
     // Update local cache
     var q=todasCotizaciones.find(function(x){return x.id===id;});
-    if(q){ q.precios_detalle=precios; q.subtotal=subtotal; q.descuento=desc; q.aplica_itbms=aplicaItbms; q.itbms=itbms; q.total=total; q.estado='cotizado'; q.duracion_estimada_min=duracionMin; }
-    revisarPendientesVencidos(); // recalcula la alerta de +12h ya que este quote salió de Pendientes
+    if(q){ q.precios_detalle=precios; q.subtotal=subtotal; q.descuento=desc; q.aplica_itbms=aplicaItbms; q.itbms=itbms; q.total=total; if(estadoAGuardar) q.estado=estadoAGuardar; q.duracion_estimada_min=duracionMin; }
+    revisarPendientesVencidos(); // recalcula la alerta de +12h ya que este quote pudo salir de Pendientes
 
-    // Cambia automáticamente al filtro "Esperando Respuesta" para que la
-    // tarjeta no desaparezca de la vista — así el botón de WhatsApp
-    // queda visible de inmediato, sin tener que navegar manualmente.
-    var chipCotizado=document.querySelector('.filter-chip[data-estado="cotizado"]');
-    if(chipCotizado) filtrarEstado(chipCotizado,'cotizado');
-    else renderCotizaciones();
-
-    setTimeout(function(){ var card=document.getElementById('qcard-'+id); if(card){card.classList.add('open'); renderQuoteDetail(id); card.scrollIntoView({behavior:'smooth',block:'center'});} },100);
+    // Solo si esta acción hizo que la cotización pasara de Pendiente a Cotizado
+    // (parte del flujo de envío manual "Enviar al Cliente") se cambia el filtro
+    // para que no "desaparezca" de la vista — la tarjeta queda COLAPSADA, no se
+    // abre sola. Si el estado no cambió (ajuste de precio en Cotizado/Aprobada),
+    // no se toca la lista — el usuario sigue viendo la misma tarjeta abierta.
+    if(estadoActual==='pendiente' && estadoAGuardar==='cotizado'){
+      var chipCotizado=document.querySelector('.filter-chip[data-estado="cotizado"]');
+      if(chipCotizado) filtrarEstado(chipCotizado,'cotizado');
+      else renderCotizaciones();
+    }
   } catch(e){
     toast('❌ Error: '+e.message);
   }
@@ -3251,6 +3316,10 @@ function construirHTMLReciboPDF(id){
   if(q.cliente_direccion) h+='<div class="client-item"><b>Dirección:</b> '+esc(q.cliente_direccion)+'</div>';
   if(q.cliente_email) h+='<div class="client-item"><b>Correo:</b> '+esc(q.cliente_email)+'</div>';
   if(q.cliente_corregimiento) h+='<div class="client-item"><b>Corregimiento:</b> '+esc(q.cliente_corregimiento)+'</div>';
+  // Fecha del servicio (cuándo se realiza/realizó el trabajo) — dato distinto a
+  // la fecha de pago; antes no aparecía en el recibo, solo en la vista interna
+  // de Panel Admin. Se muestra en naranja para diferenciarla del pago (verde).
+  if(q.fecha_servicio) h+='<div class="client-item" style="grid-column:1/-1"><div style="display:inline-flex;align-items:center;gap:6px;background:#FEF3E2;border:1.5px solid #B45309;border-radius:8px;padding:6px 12px;margin-top:2px"><span style="font-size:13px">📅</span><b style="color:#78350F">Fecha del servicio:</b> <span style="font-weight:800;color:#1B2838">'+esc(formatearFechaDDMM(q.fecha_servicio))+'</span></div></div>';
   h+='<div class="client-item" style="grid-column:1/-1"><div style="display:inline-flex;align-items:center;gap:6px;background:#E9F7EF;border:1.5px solid #2D6A4F;border-radius:8px;padding:6px 12px;margin-top:2px"><span style="font-size:13px">✅</span><b style="color:#1B4332">Pago recibido el:</b> <span style="font-weight:800;color:#1B2838">'+esc(fechaPago)+'</span>'+(q.metodo_pago?' <span style="color:#4a5568">· '+esc(q.metodo_pago)+'</span>':'')+'</div></div>';
   h+='</div>';
 
