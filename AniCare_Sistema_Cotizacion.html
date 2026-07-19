@@ -8,7 +8,7 @@
 <title>AniCare — Solicitud de Cotización</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;color:#2d3748;min-height:100vh;padding-bottom:80px}
+body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(160deg,#F4F9F5 0%,#EAF2ED 45%,#E8F1EC 100%);background-attachment:fixed;color:#2d3748;min-height:100vh;padding-bottom:80px}
 
 /* LANG BAR */
 .lang-bar{background:#40916C;display:flex;justify-content:flex-end;gap:6px;padding:8px 16px;position:sticky;top:0;z-index:200}
@@ -68,7 +68,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;color:#2d3748;mi
 .ico-flecha{display:inline-flex;animation:glow-plus 1.5s ease-in-out infinite}
 
 /* SECTION CARDS */
-.sec{background:white;border-radius:16px;box-shadow:0 1px 8px rgba(0,0,0,.07);margin-bottom:14px;overflow:hidden}
+.sec{background:#FCFEFD;border-radius:16px;box-shadow:0 1px 10px rgba(27,67,50,.08);margin-bottom:14px;overflow:hidden;border:1px solid #F0F5F1}
 .sec-head{padding:12px 16px 10px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:10px}
 .sec-icon{font-size:18px}
 .sec-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1B4332}
@@ -353,19 +353,19 @@ textarea{resize:vertical;min-height:72px}
 <div class="sec" id="carritoCard" style="display:none">
   <div class="sec-head" style="cursor:pointer;user-select:none" onclick="toggleCarrito()">
     <span class="sec-icon">🛒</span>
-    <span class="sec-title" style="flex:1">Carrito de Servicios</span>
+    <span class="sec-title" style="flex:1" data-t="carrito_title">Carrito de Servicios</span>
     <span id="carritoBadge" style="background:#40916C;color:white;border-radius:14px;padding:3px 10px;font-size:11px;font-weight:800;margin-right:8px">0</span>
     <span id="carritoChevron" style="font-size:18px;color:#40916C;font-weight:900;transition:transform .25s">▾</span>
   </div>
   <div id="carritoBody" style="display:none">
-    <button class="btn-seguir" type="button" onclick="cerrarVistaCarrito()"><span class="ico-glow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>Seguir agregando servicios</button>
+    <button class="btn-seguir" type="button" onclick="cerrarVistaCarrito()"><span class="ico-glow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span><span data-t="seguir_agregando">Seguir agregando servicios</span></button>
     <div id="carritoContent"></div>
     <div id="carritoTotal" style="background:#F0FAF4;border-top:2px solid #D8F3DC;padding:11px 16px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:11px;color:#40916C;font-weight:600">Total ítems solicitados</span>
+      <span style="font-size:11px;color:#40916C;font-weight:600" data-t="total_items_lbl">Total ítems solicitados</span>
       <span id="carritoTotalVal" style="font-size:13px;font-weight:800;color:#1B4332"></span>
     </div>
-    <button class="btn-ir-checkout" type="button" onclick="irACheckout()">📋 Solicitar Cotización</button>
-    <p style="text-align:center;font-size:11.5px;color:#78350F;font-weight:700;margin:4px 16px 14px;line-height:1.5">ℹ️ Esto es una Cotización — no un servicio confirmado ni finalizado</p>
+    <button class="btn-ir-checkout" type="button" onclick="irACheckout()">📋 <span data-t="solicitar_btn">Solicitar Cotización</span></button>
+    <p style="text-align:center;font-size:11.5px;color:#78350F;font-weight:700;margin:4px 16px 14px;line-height:1.5">ℹ️ <span data-t="cotizacion_nota">Esto es una Cotización — no un servicio confirmado ni finalizado</span></p>
   </div>
 </div>
 
@@ -797,7 +797,11 @@ var T = {
     submit_btn:"📩 Enviar Solicitud de Cotización",
     wa_btn:"Enviar Cotización por WhatsApp",pdf_btn:"Generar Cotización PDF",
     emp_lbl:"Nombre de la Empresa",emp_ph:"Razón social",
-    ruc_lbl:"RUC",ruc_ph:"Número de RUC",ph_lbl:"Nombre de PH",ph_ph:"Ej: PH Costa del Este",res_lbl:"Nombre de Residencial",res_ph:"Ej: Vista Hermosa, San Francisco..."
+    ruc_lbl:"RUC",ruc_ph:"Número de RUC",ph_lbl:"Nombre de PH",ph_ph:"Ej: PH Costa del Este",res_lbl:"Nombre de Residencial",res_ph:"Ej: Vista Hermosa, San Francisco...",
+    carrito_title:"Carrito de Servicios",seguir_agregando:"Seguir agregando servicios",
+    total_items_lbl:"Total ítems solicitados",solicitar_btn:"Solicitar Cotización",
+    cotizacion_nota:"Esto es una Cotización — no un servicio confirmado ni finalizado",
+    item_sing:"ítem",item_plur:"ítems",servicio_sing:"servicio",servicio_plur:"servicios"
   },
   en:{
     hero_title:"What cleaning service are you looking for today?",hero_sub:"Cleaning Service & Ani Care • Panama",
@@ -819,10 +823,19 @@ var T = {
     submit_btn:"📩 Send Quote Request",
     wa_btn:"Send Quote via WhatsApp",pdf_btn:"Generate PDF Quote",
     emp_lbl:"Company Name",emp_ph:"Legal name",
-    ruc_lbl:"Tax ID (RUC)",ruc_ph:"RUC number",ph_lbl:"PH Name",ph_ph:"Ex: PH Costa del Este",res_lbl:"Residential Area Name",res_ph:"Ex: Vista Hermosa, San Francisco..."
+    ruc_lbl:"Tax ID (RUC)",ruc_ph:"RUC number",ph_lbl:"PH Name",ph_ph:"Ex: PH Costa del Este",res_lbl:"Residential Area Name",res_ph:"Ex: Vista Hermosa, San Francisco...",
+    carrito_title:"Service Cart",seguir_agregando:"Keep adding services",
+    total_items_lbl:"Total items requested",solicitar_btn:"Request Quote",
+    cotizacion_nota:"This is a Quote — not a confirmed or finalized service",
+    item_sing:"item",item_plur:"items",servicio_sing:"service",servicio_plur:"services"
   }
 };
 var LANG='es';
+
+// Arma "N ítem/ítems" o "N servicio/servicios" en el idioma actual (T[LANG]).
+function pl(n,singKey,plurKey){
+  return n+' '+(n===1?T[LANG][singKey]:T[LANG][plurKey]);
+}
 
 function setLang(l){
   LANG=l;
@@ -833,6 +846,16 @@ function setLang(l){
   var phs=document.querySelectorAll('[data-tp]');
   for(var p=0;p<phs.length;p++){var kp=phs[p].getAttribute('data-tp');if(T[l][kp])phs[p].placeholder=T[l][kp];}
   actualizarCampo();
+  // El carrito y las tarjetas de servicio se arman con HTML dinámico (nombres de
+  // servicio, contadores "N ítems") que no llevan atributo data-t — sin este
+  // refresco, quedaban "congelados" en el idioma que tenían al momento de
+  // agregar cada ítem, aunque el resto de la página sí cambiaba a inglés.
+  if(typeof renderCart==='function') renderCart();
+  if(typeof sincronizarBadgeHero==='function') sincronizarBadgeHero();
+  var svcKeysAbiertos=Object.keys(svcItems||{});
+  for(var sk=0; sk<svcKeysAbiertos.length; sk++){
+    if(typeof refreshList==='function') refreshList(svcKeysAbiertos[sk]);
+  }
 }
 
 // ===================== CLIENT FIELD =====================
@@ -972,7 +995,7 @@ function actualizarDetalleBadge(){
     for(var i=0;i<cont.children.length;i++){
       if(cont.children[i].style.display!=='none') n++;
     }
-    badge.textContent=n+(n===1?' servicio':' servicios');
+    badge.textContent=pl(n,'servicio_sing','servicio_plur');
   }
 }
 
@@ -1218,7 +1241,7 @@ function renderCarritoCompacto(){
   var svcKeys=Object.keys(svcItems).filter(function(k){return svcItems[k]&&svcItems[k].length>0;});
   var totalItems=0;
   svcKeys.forEach(function(k){totalItems+=svcItems[k].length;});
-  if(badge) badge.textContent=totalItems+(totalItems===1?' ítem':' ítems');
+  if(badge) badge.textContent=pl(totalItems,'item_sing','item_plur');
   if(svcKeys.length===0){
     body.innerHTML='<p style="text-align:center;color:#a0aec0;font-size:12px;padding:20px 0">Sin ítems aún</p>';
     return;
@@ -1504,12 +1527,21 @@ var MAPA_CORREG={
   'Natá':['Natá','Coclé'],'Penonomé':['Penonomé','Coclé'],'Santiago':['Santiago','Veraguas']
 };
 
-function checkOtraMedidaPersiana(svc){
-  var sel=document.getElementById('f-medsel-'+svc);
+// "Otra medida" ahora es un enlace aparte (fuera del select) para que sea más
+// fácil de encontrar visualmente — ya no es una opción dentro del dropdown.
+function toggleOtraMedidaPersiana(svc){
   var wrap=document.getElementById('wrap-medlibre-'+svc);
-  if(!sel||!wrap) return;
-  wrap.style.display=(sel.value==='otra')?'block':'none';
-  if(sel.value!=='otra'){
+  var sel=document.getElementById('f-medsel-'+svc);
+  if(!wrap) return;
+  var mostrar=wrap.style.display!=='block';
+  wrap.style.display=mostrar?'block':'none';
+  if(mostrar&&sel) sel.value=''; // al usar "otra medida" se limpia la selección del dropdown
+}
+function ocultarOtraMedidaPersiana(svc){
+  var wrap=document.getElementById('wrap-medlibre-'+svc);
+  var sel=document.getElementById('f-medsel-'+svc);
+  if(wrap&&sel&&sel.value){
+    wrap.style.display='none';
     var inp=document.getElementById('f-medidas-'+svc);
     if(inp) inp.value='';
   }
@@ -1647,8 +1679,8 @@ function renderCard(s){
     h+='<div class="row2" style="grid-template-columns:120px 1fr">';
     h+='<div class="field"><label class="lbl">Cantidad</label>';
     h+='<input type="number" id="f-cant-'+s+'" value="1" min="1"></div>';
-    h+='<div class="field"><label class="lbl">Medida (M²) <span style="font-weight:400;color:#94a3b8">— opcional, solo informativa</span></label>';
-    h+='<select id="f-sup-'+s+'" onchange="checkOtraMedida(\''+s+'\');checkAlfombraMismatch(\''+s+'\')"><option value="">— Seleccione —</option>';
+    h+='<div class="field"><label class="lbl">Medida (M²)</label>';
+    h+='<select id="f-sup-'+s+'" onchange="ocultarOtraMedidaAlfombra(\''+s+'\');checkAlfombraMismatch(\''+s+'\')"><option value="">— Seleccione —</option>';
     h+='<optgroup label="📐 1. Pequeñas (Accent & Doormats)">';
     h+='<option>60 x 90 cm (2 x 3 pies)</option>';
     h+='<option>60 x 110 cm (2 x 4 pies)</option>';
@@ -1688,9 +1720,9 @@ function renderCard(s){
     h+='<optgroup label="🧩 7. Módulos (Alfombras Modulares)">';
     h+='<option value="modulos_50x50">Módulos · 50 x 50 cm (standard)</option>';
     h+='</optgroup>';
-    h+='<option value="otra">✏️ Otra medida (escribir)</option>';
     h+='</select></div>';
     h+='</div>'; // /row2
+    h+='<div style="margin:-6px 0 8px"><span style="font-size:12px;color:#40916C;font-weight:600;cursor:pointer;text-decoration:underline" onclick="toggleOtraMedidaAlfombra(\''+s+'\')">✏️ Otra medida (escribir)</span></div>';
     h+='<div id="om-'+s+'" style="display:none;margin-top:6px"><input type="text" id="f-om-'+s+'" placeholder="Ej: 100 x 200 cm"></div>';
     h+='<div id="om2-'+s+'" style="display:none;margin-top:6px"><label class="lbl">Escribir m² total a cubrir <span style="color:#e53e3e">(obligatoria para Módulos, Alargada y Redonda)</span></label><input type="text" id="f-om2-'+s+'" placeholder="Ej: 12 m²"></div>';
   } else {
@@ -1771,12 +1803,12 @@ function renderCard(s){
         h+='<div class="field" style="margin:0"><label class="lbl">'+(l==='en'?'Qty':'Cantidad')+'</label>';
         h+='<input type="number" id="f-cant-'+s+'" value="1" min="1"></div>';
         h+='<div class="field" style="margin:0"><label class="lbl">Medidas<span class="req">*</span></label>';
-        h+='<select id="f-medsel-'+s+'" onchange="checkOtraMedidaPersiana(\''+s+'\')"><option value="">— Seleccione —</option>';
+        h+='<select id="f-medsel-'+s+'" onchange="ocultarOtraMedidaPersiana(\''+s+'\')"><option value="">— Seleccione —</option>';
         var medsP=['60 cm x 120 cm','60 cm x 140 cm','80 cm x 140 cm','80 cm x 160 cm','100 cm x 160 cm','120 cm x 160 cm','140 cm x 160 cm','160 cm x 160 cm','180 cm x 160 cm','200 cm x 160 cm','90 cm x 220 cm','120 cm x 220 cm','150 cm x 220 cm','180 cm x 220 cm','200 cm x 220 cm'];
         for(var mp=0;mp<medsP.length;mp++){ h+='<option>'+medsP[mp]+'</option>'; }
-        h+='<option value="otra">✏️ Otra medida (escribir)</option>';
         h+='</select></div>';
         h+='</div>';
+        h+='<div style="margin:-6px 0 10px"><span style="font-size:12px;color:#40916C;font-weight:600;cursor:pointer;text-decoration:underline" onclick="toggleOtraMedidaPersiana(\''+s+'\')">✏️ Otra medida (escribir)</span></div>';
         // Campo texto libre — aparece solo con "Otra medida"
         h+='<div class="field" id="wrap-medlibre-'+s+'" style="display:none;margin-bottom:12px">';
         h+='<label class="lbl">Medidas (L x A)</label>';
@@ -2204,10 +2236,13 @@ function addItem(s){
   // Medidas obligatorias (persianas)
   if(cfg.hasEspecifMedidas){
     var medSelV=document.getElementById('f-medsel-'+s);
-    if(!medSelV||!medSelV.value){ errores.push('Medidas'); }
-    else if(medSelV.value==='otra'){
+    var medLibreWrapV=document.getElementById('wrap-medlibre-'+s);
+    var enModoLibreV=!!(medLibreWrapV&&medLibreWrapV.style.display==='block');
+    if(enModoLibreV){
       var medLibre=document.getElementById('f-medidas-'+s);
       if(!medLibre||!medLibre.value.trim()) errores.push('Medidas (L x A) — escriba la medida');
+    } else if(!medSelV||!medSelV.value){
+      errores.push('Medidas');
     }
   }
   // Nivel de suciedad obligatorio (todos los que tienen hasNivel)
@@ -2235,7 +2270,8 @@ function addItem(s){
   var clasifEl=document.getElementById('f-clasif-'+s); if(clasifEl&&clasifEl.value) item.clasificacion=clasifEl.value;
   var supEl=document.getElementById('f-sup-'+s);
   if(supEl){
-    if(supEl.value==='otra'){
+    var omDivChk=document.getElementById('om-'+s);
+    if(omDivChk&&omDivChk.style.display==='block'){
       var omEl=document.getElementById('f-om-'+s);
       item.sup=omEl?omEl.value:'';
     } else {
@@ -2373,7 +2409,7 @@ function refreshList(s){
   }
   il.innerHTML=h;
   var bc=document.getElementById('bcnt-'+s);
-  if(bc) bc.textContent=items.length+(items.length===1?' ítem':' ítems');
+  if(bc) bc.textContent=pl(items.length,'item_sing','item_plur');
 }
 
 // ===================== DELETE ITEM =====================
@@ -2429,7 +2465,8 @@ function resetForm(s){
   if(document.getElementById('f-cant-'+s)) document.getElementById('f-cant-'+s).value='1';
   var pEl=document.getElementById('f-puestos-'+s); if(pEl) pEl.value='';
   var mEl=document.getElementById('f-medidas-'+s); if(mEl) mEl.value='';
-  var msEl=document.getElementById('f-medsel-'+s); if(msEl){ msEl.value=''; checkOtraMedidaPersiana(s); }
+  var msEl=document.getElementById('f-medsel-'+s); if(msEl) msEl.value='';
+  var mlWrap=document.getElementById('wrap-medlibre-'+s); if(mlWrap) mlWrap.style.display='none';
   var eaEl2=document.getElementById('f-ea-'+s); if(eaEl2) eaEl2.value='';
   var eaDiv=document.getElementById('ea-'+s); if(eaDiv) eaDiv.style.display='none';
   var eaIco=document.getElementById('ea-ico-'+s); if(eaIco) eaIco.textContent='▾';
@@ -2439,6 +2476,8 @@ function resetForm(s){
   if(m2Btn){m2Btn.style.background='#f7f8fa';m2Btn.style.color='#4a5568';m2Btn.classList.remove('sel');}
   var otEl=document.getElementById('f-ot-'+s);
   if(otEl){ otEl.value=''; var otDiv=document.getElementById('ot-'+s); if(otDiv) otDiv.style.display='none'; }
+  var omInput=document.getElementById('f-om-'+s); if(omInput) omInput.value='';
+  var omWrap=document.getElementById('om-'+s); if(omWrap) omWrap.style.display='none';
 }
 
 // ===================== CONFIRM SERVICE =====================
@@ -3161,7 +3200,7 @@ function construirHTMLPDF(d, numCot, fecha){
   // ── Nota: cotización pendiente de aprobación ──
   h+='<div style="background:#FEF3E2;border:1.5px solid #D97706;border-radius:10px;padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:10px">';
   h+='<span style="font-size:18px">⏳</span>';
-  h+='<span style="font-size:12px;font-weight:800;color:#92400E">Cotización pendiente de aprobación</span>';
+  h+='<span style="font-size:12px;font-weight:800;color:#92400E">En breve recibirá su cotización — ¡gracias por preferirnos! 🌿</span>';
   h+='</div>';
 
   // ── Garantía ──
@@ -3240,7 +3279,7 @@ function renderCart(){
 
   // El carrito solo se muestra al abrirlo desde el boton Carrito del encabezado
   card.style.display=vistaCarritoAbierta?'block':'none';
-  badge.textContent=totalItems+(totalItems===1?' ítem':' ítems');
+  badge.textContent=pl(totalItems,'item_sing','item_plur');
 
   var h='';
   for(var si=0;si<svcKeys.length;si++){
@@ -3252,7 +3291,7 @@ function renderCart(){
     h+='<div class="csvc-toggle" onclick="toggleCartSvc(this)">';
     h+='<span class="csvc-ico">'+(d?d.icon:'')+'</span>';
     h+='<span class="csvc-name">'+(d?d.name[LANG]:s)+'</span>';
-    h+='<span class="csvc-cnt">'+items.length+(items.length===1?' ítem':' ítems')+'</span>';
+    h+='<span class="csvc-cnt">'+pl(items.length,'item_sing','item_plur')+'</span>';
     h+='<span class="csvc-arrow">▾</span></div>';
     h+='<div class="csvc-items">';
     for(var ii=0;ii<items.length;ii++){
@@ -3272,7 +3311,7 @@ function renderCart(){
     h+='</div></div>';
   }
   content.innerHTML=h;
-  totalVal.textContent=totalItems+(totalItems===1?' ítem':' ítems')+' · '+svcKeys.length+(svcKeys.length===1?' servicio':' servicios');
+  totalVal.textContent=pl(totalItems,'item_sing','item_plur')+' · '+pl(svcKeys.length,'servicio_sing','servicio_plur');
 
   // Auto-expand body when first item added
   var body=document.getElementById('carritoBody');
@@ -3409,10 +3448,21 @@ function checkSofaCama(s){
   if(puestosWrap) puestosWrap.style.display=esSofaCama?'none':'';
 }
 // Check Otra Medida (alfombras)
-function checkOtraMedida(s){
-  var sel=document.getElementById('f-sup-'+s);
+// "Otra medida" ahora es un enlace aparte (fuera del select) para que sea más
+// fácil de encontrar visualmente — ya no es una opción dentro del dropdown.
+function toggleOtraMedidaAlfombra(s){
   var div=document.getElementById('om-'+s);
-  if(div) div.style.display=(sel&&sel.value==='otra')?'block':'none';
+  var sel=document.getElementById('f-sup-'+s);
+  if(!div) return;
+  var mostrar=div.style.display!=='block';
+  div.style.display=mostrar?'block':'none';
+  if(mostrar&&sel) sel.value=''; // al usar "otra medida" se limpia la selección del dropdown
+  actualizarVisibilidadM2Alfombra(s);
+}
+function ocultarOtraMedidaAlfombra(s){
+  var div=document.getElementById('om-'+s);
+  var sel=document.getElementById('f-sup-'+s);
+  if(div&&sel&&sel.value){ div.style.display='none'; var inp=document.getElementById('f-om-'+s); if(inp) inp.value=''; }
   actualizarVisibilidadM2Alfombra(s);
 }
 // El campo "m² total a cubrir" aplica en 2 casos: Módulos (por la Medida elegida)
