@@ -2591,7 +2591,6 @@ function recopilar(){
       if(s==='alfombras'){
         // Tipo, Clasificación, Forma, Medida, Ubicación, Estado Actual, Nivel
         if(it.tipo) p.push(it.tipo);
-        if(it.cant) p.push('x'+it.cant);
         if(it.clasificacion) p.push(it.clasificacion);
         if(it.forma) p.push(it.forma);
         if(medida) p.push(medida);
@@ -2601,7 +2600,6 @@ function recopilar(){
       } else if(s==='persianas'){
         // Tipo, Medidas, Ubicación, Estado Actual, Nivel
         if(it.tipo) p.push(it.tipo);
-        if(it.cant) p.push('x'+it.cant);
         if(medida) p.push(medida);
         if(it.ubicacion) p.push('📍 '+it.ubicacion);
         if(motivosTxt) p.push(motivosTxt);
@@ -2610,14 +2608,12 @@ function recopilar(){
       } else if(s==='colchones'){
         // Tipo, Tamaño/Modelo, Estado Actual, Nivel
         if(it.tipo) p.push(it.tipo);
-        if(it.cant) p.push('x'+it.cant);
         if(it.tammod) p.push(it.tammod);
         if(motivosTxt) p.push(motivosTxt);
         if(it.nivTxt) p.push('Nivel:'+it.nivTxt);
       } else if(s==='sofas'){
         // Tipo, Cantidad de Puestos (o Tamaño/Modelo si es Sofá Cama), Estado Actual, Nivel
         if(it.tipo) p.push(it.tipo);
-        if(it.cant) p.push('x'+it.cant);
         if(it.otroText) p.push(it.otroText);
         if(it.tammod) p.push(it.tammod);
         else if(it.puestos) p.push(formatPuestos(it.puestos));
@@ -2635,8 +2631,7 @@ function recopilar(){
         if(esRotativa){
           if(medida) p.push(medida);
         } else {
-          if(it.cant) p.push('x'+it.cant);
-          if(motivosTxt) p.push(motivosTxt);
+            if(motivosTxt) p.push(motivosTxt);
           if(it.nivTxt) p.push('Nivel:'+it.nivTxt);
         }
       } else if(s==='comercial'||s==='hogar'){
@@ -2650,7 +2645,6 @@ function recopilar(){
       } else {
         // Cualquier otro caso — orden genérico, para no perder nada
         if(it.tipo) p.push(it.tipo);
-        if(it.cant) p.push('x'+it.cant);
         if(it.forma) p.push(it.forma);
         if(it.clasificacion) p.push(it.clasificacion);
         if(it.tammod) p.push(it.tammod);
@@ -2663,7 +2657,12 @@ function recopilar(){
         if(motivosTxt) p.push(motivosTxt);
         if(it.nivTxt) p.push('Nivel:'+it.nivTxt);
       }
-      lineas.push('  '+(i+1)+'. '+p.join(' | '));
+      // BUG CORREGIDO (19-jul-2026): antes salía "1. Tipo | x1 | ..." — el número
+      // de lista (i+1) y la cantidad ("xN") se veían duplicados/confusos. Ahora
+      // se muestra "Cantidad: N" (la cantidad real del ítem, o "1" si no aplica),
+      // sin numeración de lista, seguido de dos espacios y la descripción.
+      var cantTxt = it.cant ? String(it.cant) : '1';
+      lineas.push('  Cantidad: '+cantTxt+'  '+p.join(' | '));
     }
     svcs.push(nombre+':\n'+lineas.join('\n'));
   }
