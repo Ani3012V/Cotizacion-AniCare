@@ -128,6 +128,11 @@ var TIPOS_NOMBRE = {
 
 // Arma la línea descriptiva de un ítem (formato nuevo) a partir de los campos que
 // tenga presentes — mismo criterio que usa Panel Admin para mostrar cada ítem.
+// BUG CORREGIDO (19-jul-2026): faltaban ubicación y color/tela — Correo 1
+// sí los mostraba (vienen del formulario), pero este descItem() (usado en el
+// Correo 3) los omitía para cotizaciones en formato de objeto estructurado,
+// dejando el detalle más pobre que en los otros correos. Se agregan para que
+// el nivel de detalle sea el mismo en los 4 correos.
 function descItem(it){
   var partes=[];
   if(it.tipo) partes.push(it.tipo);
@@ -139,6 +144,8 @@ function descItem(it){
   if(it.medidas) partes.push(it.medidas);
   if(it.area) partes.push(it.area+' m²');
   if(it.cant && parseInt(it.cant,10)>1) partes.push('x'+it.cant);
+  if(it.ubicacion) partes.push('📍 '+it.ubicacion);
+  if(it.telColor) partes.push('🎨 '+it.telColor);
   if(it.motivos && it.motivos.length) partes.push(it.motivos.join(', '));
   return partes.join(' · ');
 }
