@@ -63,6 +63,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 .cal-leyenda{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:2px 0 20px;font-size:12px;color:#718096}
 .cal-leyenda span{display:inline-flex;align-items:center;gap:6px}
 .cal-dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+
+.hora-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+.hora-slot{border-radius:11px;padding:13px 4px;text-align:center;border:1.5px solid #95D5B2;background:#F0FAF4;color:#1B4332;font-weight:700;font-size:14.5px;font-family:inherit;cursor:pointer;transition:transform .12s,border-color .12s}
+.hora-slot:hover{border-color:#40916C;transform:translateY(-2px)}
+.hora-slot.ocupada{border-color:#F1F3F5;background:#F1F3F5;color:#A0AEC0;cursor:not-allowed}
+.hora-nota{font-size:12px;color:#a0aec0;text-align:center;margin-top:2px}
+.btn-volver{width:100%;background:none;border:1.5px solid #D8F3DC;color:#2D6A4F;border-radius:11px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:14px;font-family:inherit}
 </style>
 </head>
 <body>
@@ -304,7 +311,9 @@ async function enviarCorreoAprobacionCliente(){
           direccion:quoteData.cliente_direccion||''
         },
         servicios:construirResumenServiciosTexto(),
-        fecha:quoteData.fecha_servicio||''
+        fecha:quoteData.fecha_servicio||'',
+        hora:quoteData.hora_servicio||'',
+        duracionMin:quoteData.duracion_estimada_min||null
       })
     });
   } catch(e){ console.warn('No se pudo enviar el correo de confirmación al cliente:', e); }
@@ -472,6 +481,7 @@ async function crearEventoCalendar(){
           telefono:quoteData.cliente_telefono||''
         },
         fecha:quoteData.fecha_servicio,
+        hora:quoteData.hora_servicio||null,
         duracionMin:quoteData.duracion_estimada_min||null,
         servicios:construirResumenServiciosTexto(),
         total:(quoteData.total||0).toFixed(2)
@@ -480,19 +490,119 @@ async function crearEventoCalendar(){
   } catch(e){ console.warn('No se pudo crear el evento en Google Calendar:', e); }
 }
 
+var DIAS_CACHE = null; // guarda los 15 días ya calculados, para poder "volver" sin recalcular
+
+// Antes esta función confirmaba la fecha directo; ahora primero muestra las
+// horas disponibles de ese día (cada 30 min, sin almuerzo 12:00-12:30, nada
+// antes de 8:30am) y la confirmación real ocurre en elegirHora().
 async function elegirFecha(fechaISO){
   var body = document.getElementById('bodyContent');
-  body.innerHTML = '<div class="loading"><div class="spinner"></div>Confirmando fecha...</div>';
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>Buscando horarios disponibles...</div>';
+  try{
+    var duracionMin = quoteData.duracion_estimada_min || 120;
+    var cfg = CONFIG_CAL_PUBLICO;
+    var diaSemana = new Date(fechaISO+'T00:00:00').getDay();
+    var horaFinDia = diaSemana===6 ? cfg.sab_fin : cfg.lunvie_fin;
+    var margen = cfg.margen_traslado_min || 0;
+
+    var {data:ocupados, error:eOc} = await sb.rpc('obtener_horarios_ocupados_publica', {p_fecha:fechaISO});
+    if(eOc) throw eOc;
+
+    var slots = generarSlotsHora(fechaISO, horaFinDia, duracionMin, margen, ocupados||[]);
+    renderSeleccionHora(fechaISO, slots);
+  } catch(e){
+    console.error('Error buscando horarios:', e);
+    // Si falla, no se bloquea al cliente — se confirma solo con la fecha, sin hora específica.
+    confirmarFechaSinHora(fechaISO);
+  }
+}
+
+// Genera franjas de 30 min desde 8:30am hasta que ya no quepa la duración
+// estimada antes del cierre del día, bloqueando siempre 12:00-12:30 (almuerzo)
+// y cualquier franja que se cruce con un servicio ya confirmado ese día.
+function generarSlotsHora(fechaISO, horaFinDia, duracionMin, margen, ocupados){
+  var slots = [];
+  var finMin = minutosEntreHoras('00:00', horaFinDia);
+  var inicioMin = minutosEntreHoras('00:00','08:30');
+  var almuerzoIni = minutosEntreHoras('00:00','12:00');
+  var almuerzoFin = minutosEntreHoras('00:00','12:30');
+
+  var ocupadosMin = (ocupados||[]).map(function(o){
+    var ini = minutosEntreHoras('00:00', o.hora_inicio);
+    return {ini:ini-margen, fin:ini+(o.duracion_min||120)+margen};
+  });
+
+  for(var t=inicioMin; t+duracionMin<=finMin; t+=30){
+    var cruzaAlmuerzo = t < almuerzoFin && (t+duracionMin) > almuerzoIni;
+    var cruzaOcupado = ocupadosMin.some(function(o){ return t < o.fin && (t+duracionMin) > o.ini; });
+    var libre = !cruzaAlmuerzo && !cruzaOcupado;
+    var hh = Math.floor(t/60), mm = t%60;
+    var hora24 = (hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm;
+    slots.push({hora24:hora24, libre:libre});
+  }
+  return slots;
+}
+
+function formatearHora12(hora24){
+  var p = hora24.split(':'); var h = parseInt(p[0],10), m = p[1];
+  var ampm = h>=12 ? 'pm' : 'am';
+  var h12 = h%12; if(h12===0) h12=12;
+  return h12+':'+m+' '+ampm;
+}
+
+function renderSeleccionHora(fechaISO, slots){
+  var body = document.getElementById('bodyContent');
+  var fechaObj = new Date(fechaISO+'T00:00:00');
+  var fechaTxt = fechaObj.toLocaleDateString('es-PA',{weekday:'long',day:'numeric',month:'long'});
+
+  var h = '<div class="fecha-title">🕒 Elige la hora de tu servicio</div>';
+  h += '<div class="fecha-sub">'+esc(fechaTxt)+' &middot; duración estimada '+Math.round((quoteData.duracion_estimada_min||120)/60*10)/10+'h</div>';
+
+  h += '<div class="hora-grid">';
+  slots.forEach(function(s){
+    if(s.libre){
+      h += '<button type="button" class="hora-slot" onclick="elegirHora(\''+fechaISO+'\',\''+s.hora24+'\')">'+formatearHora12(s.hora24)+'</button>';
+    } else {
+      h += '<button type="button" class="hora-slot ocupada" disabled>'+formatearHora12(s.hora24)+'</button>';
+    }
+  });
+  h += '</div>';
+
+  h += '<div class="hora-nota">Almuerzo bloqueado de 12:00 a 12:30 pm</div>';
+  h += '<button type="button" class="btn-volver" onclick="mostrarSeleccionFecha()">← Elegir otro día</button>';
+
+  body.innerHTML = h;
+}
+
+async function elegirHora(fechaISO, hora24){
+  var body = document.getElementById('bodyContent');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>Confirmando fecha y hora...</div>';
+  try{
+    var {data, error} = await sb.rpc('confirmar_fecha_hora_servicio', {p_token:TOKEN, p_fecha:fechaISO, p_hora:hora24});
+    if(error) throw error;
+    quoteData.fecha_servicio = fechaISO;
+    quoteData.hora_servicio = hora24;
+    enviarCorreoAprobacionCliente(); // Correo 3 — ahora sí con fecha y hora confirmadas
+    crearEventoCalendar(); // Evento en Google Calendar de AniCare
+    mostrarResultado(true);
+  } catch(e){
+    console.error('Error confirmando fecha y hora:', e);
+    confirmarFechaSinHora(fechaISO);
+  }
+}
+
+// Camino de respaldo: si falla la confirmación con hora, se intenta guardar
+// solo la fecha (como funcionaba antes de agregar selección de hora).
+async function confirmarFechaSinHora(fechaISO){
   try{
     var {data, error} = await sb.rpc('confirmar_fecha_servicio', {p_token:TOKEN, p_fecha:fechaISO});
     if(error) throw error;
     quoteData.fecha_servicio = fechaISO;
-    enviarCorreoAprobacionCliente(); // Correo 3 — ahora sí con la fecha ya confirmada
-    crearEventoCalendar(); // Evento en Google Calendar de AniCare
+    enviarCorreoAprobacionCliente();
+    crearEventoCalendar();
     mostrarResultado(true);
   } catch(e){
     console.error('Error confirmando fecha:', e);
-    // No se pudo guardar la fecha (poco probable) — se sigue igual sin bloquear al cliente.
     notificarSinFechaYContinuar();
   }
 }
@@ -532,13 +642,15 @@ function mostrarResultado(aprobado){
   var body = document.getElementById('bodyContent');
   if(aprobado){
     var tieneFecha = !!quoteData.fecha_servicio;
+    var tieneHora = !!quoteData.hora_servicio;
     var mensajePrincipal = tieneFecha
-      ? 'Nos pondremos en contacto contigo pronto. Nuestro técnico llegará en la fecha y hora solicitada — por favor esté pendiente ese día para su ingreso.'
+      ? 'Nos pondremos en contacto contigo pronto. Nuestro técnico llegará en la fecha'+(tieneHora?' y hora':'')+' solicitada — por favor esté pendiente ese día para su ingreso.'
       : 'Nos pondremos en contacto contigo pronto para coordinar la fecha del servicio.';
+    var lineaHora = tieneHora ? '<br><span style="display:inline-block;margin-top:2px;font-size:15px;font-weight:700;color:#2D6A4F">'+esc(formatearHora12(quoteData.hora_servicio))+'</span>' : '';
     body.innerHTML = '<div class="result-screen">'+
       '<div class="result-icon ok">✓</div>'+
       '<div class="result-title">¡Gracias por confiar en nosotros!</div>'+
-      '<div class="result-msg">Hemos recibido tu aprobación para la cotización<br><span style="display:inline-block;margin:6px 0;font-size:19px;font-weight:900;color:#2563EB">N° '+esc(quoteData.numero_cot)+'</span><br>'+mensajePrincipal+'</div>'+
+      '<div class="result-msg">Hemos recibido tu aprobación para la cotización<br><span style="display:inline-block;margin:6px 0;font-size:19px;font-weight:900;color:#2563EB">N° '+esc(quoteData.numero_cot)+'</span>'+lineaHora+'<br>'+mensajePrincipal+'</div>'+
       '<div class="result-note">⏰ Cualquier cambio de fecha debe ser notificado con 24 horas de anticipación.</div>'+
       '<div class="footer-note">Cleaning Service & Ani Care · Panamá<br>WhatsApp: +507 6317-1227</div>'+
       '</div>';
