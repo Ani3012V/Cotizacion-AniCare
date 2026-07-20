@@ -2406,7 +2406,15 @@ function renderQuoteDetail(id){
 
         var sugerenciaLabel = '';
         var precioSugerido = precioActual;
-        if(precioActual > 0 && item.manual !== true){
+        // Servicios que SIEMPRE son de precio manual (ver Indicaciones), sin
+        // importar la tarifa cargada en Gestión de Precios. Se muestra una nota
+        // aparte solo en esta pantalla (Panel Admin) — a pedido de Ani, esta
+        // nota NO debe aparecer en el PDF que recibe el cliente, así que solo
+        // se agrega aquí en renderQuoteDetail y no en construirHTMLCotizacionPDF.
+        var SERVICIOS_SIEMPRE_MANUALES = ['hogar','comercial','pulido'];
+        if(SERVICIOS_SIEMPRE_MANUALES.indexOf(svcKey)>-1){
+          sugerenciaLabel = '✋ Ingreso de precio manual';
+        } else if(precioActual > 0 && item.manual !== true){
           sugerenciaLabel = '🧠 calculado automáticamente';
         }
 
@@ -2910,6 +2918,15 @@ function generarCotizacionPDFBase64(id){
   });
 }
 
+// Quita etiquetas HTML y colapsa espacios — se usa para pasar de las
+// descripciones HTML (que arma el PDF) al texto plano de los correos.
+function stripHtmlTexto(html){
+  if(!html) return '';
+  var tmp=document.createElement('div');
+  tmp.innerHTML=html;
+  return (tmp.textContent||tmp.innerText||'').replace(/\s+/g,' ').trim();
+}
+
 function construirHTMLCotizacionPDF(id){
   var q=todasCotizaciones.find(function(x){return x.id===id;});
   if(!q) return null;
@@ -3111,11 +3128,20 @@ function construirHTMLCotizacionPDF(id){
 
   h+='</body></html>';
 
+  // BUG CORREGIDO (19-jul-2026): el texto del Correo 2 solo mostraba el total
+  // por servicio ("Sofás y Muebles — $35.00"), sin el detalle de cada ítem que
+  // sí aparece en el Correo 1 — ahora se lista cada ítem por separado, con la
+  // misma cantidad/descripción, para que el nivel de detalle sea igual.
   var resumenTexto='';
   ordenServicios.forEach(function(svcName){
     var itemsSvc=gruposPorServicio[svcName];
-    var subtotalSvc=itemsSvc.reduce(function(a,it){return a+(it.precioVacio?0:it.precio);},0);
-    resumenTexto+=svcName+' — $'+subtotalSvc.toFixed(2)+'\n';
+    resumenTexto+=svcName+':\n';
+    itemsSvc.forEach(function(it){
+      var descPlano=stripHtmlTexto(it.desc);
+      var cantPlano=stripHtmlTexto(it.badge)||'1';
+      var precioTxt=it.precioVacio?'(precio por definir)':'$'+it.precio.toFixed(2);
+      resumenTexto+='  '+cantPlano+'  '+descPlano+' — '+precioTxt+'\n';
+    });
   });
   resumenTexto+='\nSubtotal: $'+subtotal.toFixed(2);
   if(desc>0) resumenTexto+='\nDescuento: -$'+desc.toFixed(2);
@@ -3402,11 +3428,17 @@ function construirHTMLReciboPDF(id){
 
   h+='</body></html>';
 
+  // BUG CORREGIDO (19-jul-2026): mismo caso que en Correo 2 — se lista cada
+  // ítem por separado en vez de solo el total por servicio.
   var resumenTexto='';
   ordenServicios.forEach(function(svcName){
     var itemsSvc=gruposPorServicio[svcName];
-    var subtotalSvc=itemsSvc.reduce(function(a,it){return a+it.precio;},0);
-    resumenTexto+=svcName+' — $'+subtotalSvc.toFixed(2)+'\n';
+    resumenTexto+=svcName+':\n';
+    itemsSvc.forEach(function(it){
+      var descPlano=stripHtmlTexto(it.desc);
+      var cantPlano=stripHtmlTexto(it.badge)||'1';
+      resumenTexto+='  '+cantPlano+'  '+descPlano+' — $'+it.precio.toFixed(2)+'\n';
+    });
   });
   resumenTexto+='\nSubtotal: $'+subtotal.toFixed(2);
   if(desc>0) resumenTexto+='\nDescuento: -$'+desc.toFixed(2);
