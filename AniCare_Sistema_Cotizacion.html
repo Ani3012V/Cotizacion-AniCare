@@ -2662,7 +2662,7 @@ function recopilar(){
       // se muestra "Cantidad: N" (la cantidad real del ítem, o "1" si no aplica),
       // sin numeración de lista, seguido de dos espacios y la descripción.
       var cantTxt = it.cant ? String(it.cant) : '1';
-      lineas.push('  Cantidad: '+cantTxt+'  '+p.join(' | '));
+      lineas.push('  '+cantTxt+'  '+p.join(' | '));
     }
     svcs.push(nombre+':\n'+lineas.join('\n'));
   }
