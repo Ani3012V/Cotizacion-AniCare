@@ -2161,8 +2161,8 @@ var SERVICIOS_SIN_CANTIDAD_REAL=['comercial','hogar','pisos','pulido','alfombras
 
 var ESTADO_EXCEL={pendiente:'Pendiente',cotizado:'Esperando Respuesta',aprobada:'Aprobada',pagada:'Pagada',cancelada:'Cancelada'};
 
-function exportarExcel(){
-  if(typeof XLSX==='undefined'){ toast('❌ Librería Excel no cargó. Revisa tu conexión a internet.'); return; }
+async function exportarExcel(){
+  if(typeof ExcelJS==='undefined'){ toast('❌ Librería ExcelJS no cargó. Revisa tu conexión a internet.'); return; }
   var filas=[];
 
   todasCotizaciones.forEach(function(q){
@@ -2234,14 +2234,124 @@ function exportarExcel(){
     return a['Cliente (Contacto)'].localeCompare(b['Cliente (Contacto)'],'es');
   });
 
-  var ws=XLSX.utils.json_to_sheet(filas);
-  ws['!cols']=[
-    {wch:16},{wch:18},{wch:12},{wch:22},{wch:14},{wch:20},{wch:16},{wch:22},{wch:28},{wch:10},{wch:10}
-  ];
-  var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Cotizaciones');
+  toast('📊 Generando Excel...');
+
+  // Mismo diseño que el reporte de Recibos de Pago: banner azul oscuro,
+  // franja dorada, logo, encabezado congelado, filas alternadas y fila de TOTAL.
+  var AZUL_OSCURO='FF0B1F3A', DORADO='FFC9A961', AZUL_TOTAL='FF16325C', GRIS_FILA='FFF7F8FA', BLANCO='FFFFFFFF';
+  var NCOLS=11;
+
+  var wb=new ExcelJS.Workbook();
+  var ws=wb.addWorksheet('Cotizaciones');
+  ws.views=[{showGridLines:false}];
+
+  for(var row=1;row<=4;row++){
+    for(var col=1;col<=NCOLS;col++){
+      ws.getCell(row,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_OSCURO}};
+    }
+    ws.getRow(row).height=22;
+  }
+
+  var logoBase64=LOGO_BASE64.split(',')[1];
+  var imgId=wb.addImage({base64:logoBase64,extension:'png'});
+  ws.addImage(imgId,{tl:{col:0,row:0},ext:{width:178,height:82}});
+
+  ws.mergeCells('C1:K2');
+  var tituloCell=ws.getCell('C1');
+  tituloCell.value='Cleaning Service & Ani Care — Reporte de Cotizaciones';
+  tituloCell.font={name:'Arial',size:15,bold:true,color:{argb:BLANCO}};
+  tituloCell.alignment={horizontal:'left',vertical:'middle',indent:1};
+
+  ws.mergeCells('C4:K4');
+  var subCell=ws.getCell('C4');
+  var fechaGenerada=new Date().toLocaleDateString('es-PA',{day:'2-digit',month:'2-digit',year:'numeric'});
+  subCell.value='RUC: E-8-150284 DV 05   |   Generado: '+fechaGenerada+'   |   Total de filas: '+filas.length;
+  subCell.font={name:'Arial',size:9.5,italic:true,color:{argb:'FF9CAECF'}};
+  subCell.alignment={horizontal:'left',vertical:'middle',indent:1};
+
+  for(var col=1;col<=NCOLS;col++){
+    ws.getCell(5,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:DORADO}};
+  }
+  ws.getRow(5).height=4;
+
+  var headers=['No. de Cotización','Estatus','Fecha','Cliente (Contacto)','Tipo de Cliente','Lugar','Condición del Cliente','Servicio Solicitado','Tipo de Servicio Solicitado','Cantidad','Monto'];
+  var headerRow=6;
+  headers.forEach(function(h,i){
+    var c=ws.getCell(headerRow,i+1);
+    c.value=h;
+    c.font={name:'Arial',size:10,bold:true,color:{argb:BLANCO}};
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_OSCURO}};
+    c.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+    c.border={bottom:{style:'medium',color:{argb:DORADO}}};
+  });
+  ws.getRow(headerRow).height=32;
+
+  var camposOrden=['No. de Cotización','Estatus','Fecha','Cliente (Contacto)','Tipo de Cliente','Lugar','Condición del Cliente','Servicio Solicitado','Tipo de Servicio Solicitado','Cantidad','Monto'];
+  var r=headerRow+1;
+  filas.forEach(function(fila){
+    camposOrden.forEach(function(campo,i){
+      var c=ws.getCell(r,i+1);
+      c.value=fila[campo];
+      c.font={name:'Arial',size:10,color:{argb:'FF2D3748'}};
+      if(i===10){ // Monto
+        c.alignment={horizontal:'right',vertical:'middle'};
+        c.numFmt='$#,##0.00';
+      } else if(i===3||i===5||i===7||i===8){ // Cliente, Lugar, Servicio, Tipo de Servicio
+        c.alignment={horizontal:'left',vertical:'middle',wrapText:true};
+      } else {
+        c.alignment={horizontal:'center',vertical:'middle'};
+      }
+      c.border={bottom:{style:'thin',color:{argb:'FFE2E8F0'}}};
+    });
+    ws.getRow(r).height=28;
+    if((r-headerRow)%2===0){
+      for(var col=1;col<=NCOLS;col++){
+        ws.getCell(r,col).fill={type:'pattern',pattern:'solid',fgColor:{argb:GRIS_FILA}};
+      }
+    }
+    r++;
+  });
+
+  var totalRow=r;
+  var firstDataRow=headerRow+1;
+  var lastDataRow=r-1;
+  ws.mergeCells(totalRow,1,totalRow,10);
+  var totalLbl=ws.getCell(totalRow,1);
+  totalLbl.value='TOTAL';
+  totalLbl.font={name:'Arial',size:11,bold:true,color:{argb:BLANCO}};
+  totalLbl.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_TOTAL}};
+  totalLbl.alignment={horizontal:'right',vertical:'middle',indent:1};
+
+  var totalCell=ws.getCell(totalRow,11);
+  totalCell.value={formula:'SUM(K'+firstDataRow+':K'+lastDataRow+')'};
+  totalCell.font={name:'Arial',size:11,bold:true,color:{argb:BLANCO}};
+  totalCell.fill={type:'pattern',pattern:'solid',fgColor:{argb:AZUL_TOTAL}};
+  totalCell.numFmt='$#,##0.00';
+  totalCell.alignment={horizontal:'right',vertical:'middle'};
+  ws.getRow(totalRow).height=26;
+
+  var widths=[16,18,12,22,14,20,16,22,28,10,12];
+  widths.forEach(function(w,i){ ws.getColumn(i+1).width=w; });
+
+  var notaRow=totalRow+2;
+  ws.mergeCells(notaRow,1,notaRow,NCOLS);
+  var notaCell=ws.getCell(notaRow,1);
+  notaCell.value='Nota: Este reporte agrupa cada servicio solicitado como una fila individual dentro de su cotización.';
+  notaCell.font={name:'Arial',size:8,italic:true,color:{argb:'FF94A3B8'}};
+
+  ws.views=[{showGridLines:false,state:'frozen',ySplit:headerRow}];
+
+  var buffer=await wb.xlsx.writeBuffer();
+  var blob=new Blob([buffer],{type:'application/octet-stream'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
   var fechaArchivo=new Date().toISOString().split('T')[0];
-  XLSX.writeFile(wb,'AniCare_Cotizaciones_'+fechaArchivo+'.xlsx');
+  a.download='AniCare_Cotizaciones_'+fechaArchivo+'.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
   toast('✅ Excel generado: '+filas.length+' fila(s)');
 }
 
