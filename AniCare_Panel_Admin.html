@@ -2191,43 +2191,37 @@ function exportarExcel(){
       return;
     }
 
-    servicios.forEach(function(servicioTexto,si){
-      if(servicioTexto===null||servicioTexto===undefined) return; // ítem vacío/corrupto — se omite
-      var lines=String(servicioTexto).split('\n');
-      var svcName=lines[0].replace(':','').trim();
-      var svcKey=Object.keys(TIPOS_MAP).find(function(k){return TIPOS_MAP[k].nombre===svcName;});
+    servicios.forEach(function(item){
+      if(!item||typeof item!=='object') return; // ítem vacío/corrupto — se omite
+      var svcKey=item.svc||'';
+      var svcName=(TIPOS_MAP[svcKey]&&TIPOS_MAP[svcKey].nombre)||svcKey||'(Servicio sin identificar)';
       var esAreaSinCantidad=svcKey&&SERVICIOS_SIN_CANTIDAD_REAL.indexOf(svcKey)>-1;
 
-      for(var li=1;li<lines.length;li++){
-        if(!lines[li].trim()) continue;
-        var itemKey=si+'_'+li;
-        var precio=precios[itemKey]!==undefined?parseFloat(precios[itemKey]):0;
-        var tipoDetalle=parseTipoKey(lines[li]);
-        // Quita el "xN" del detalle de tipo para que quede limpio (la cantidad va en su propia columna)
-        tipoDetalle=tipoDetalle.replace(/\s*·\s*x\d+/i,'').replace(/^x\d+\s*·\s*/i,'');
+      var tipoDetalle=construirDescOrdenada(svcKey,item);
+      var precio=item.precio!==undefined&&item.precio!==null?parseFloat(item.precio):0;
+      if(isNaN(precio)) precio=0;
 
-        var cantidad;
-        if(esAreaSinCantidad){
-          cantidad=1; // 1 servicio solicitado (no aplica cantidad real, ej: Hogar, Comercial, Pisos, Pulido, Alfombras)
-        } else {
-          var cantMatch=lines[li].match(/(?:^|\|)\s*x(\d+)\s*(?:\||$)/i);
-          cantidad=cantMatch?parseInt(cantMatch[1]):1;
-        }
-
-        filas.push({
-          'No. de Cotización':q.numero_cot||'',
-          'Estatus':ESTADO_EXCEL[q.estado]||q.estado,
-          'Fecha':fechaStr,
-          'Cliente (Contacto)':nombreCliente(q),
-          'Tipo de Cliente':q.cliente_tipo||'',
-          'Lugar':lugar,
-          'Condición del Cliente':tipoClienteEstado,
-          'Servicio Solicitado':svcName,
-          'Tipo de Servicio Solicitado':tipoDetalle,
-          'Cantidad':cantidad,
-          'Monto':precio
-        });
+      var cantidad;
+      if(esAreaSinCantidad){
+        cantidad=1; // 1 servicio solicitado (no aplica cantidad real, ej: Hogar, Comercial, Pisos, Pulido, Alfombras)
+      } else {
+        cantidad=item.cant!==undefined?parseInt(item.cant):1;
+        if(isNaN(cantidad)) cantidad=1;
       }
+
+      filas.push({
+        'No. de Cotización':q.numero_cot||'',
+        'Estatus':ESTADO_EXCEL[q.estado]||q.estado,
+        'Fecha':fechaStr,
+        'Cliente (Contacto)':nombreCliente(q),
+        'Tipo de Cliente':q.cliente_tipo||'',
+        'Lugar':lugar,
+        'Condición del Cliente':tipoClienteEstado,
+        'Servicio Solicitado':svcName,
+        'Tipo de Servicio Solicitado':tipoDetalle,
+        'Cantidad':cantidad,
+        'Monto':precio
+      });
     });
   });
 
