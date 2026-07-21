@@ -2192,7 +2192,8 @@ function exportarExcel(){
     }
 
     servicios.forEach(function(servicioTexto,si){
-      var lines=servicioTexto.split('\n');
+      if(servicioTexto===null||servicioTexto===undefined) return; // ítem vacío/corrupto — se omite
+      var lines=String(servicioTexto).split('\n');
       var svcName=lines[0].replace(':','').trim();
       var svcKey=Object.keys(TIPOS_MAP).find(function(k){return TIPOS_MAP[k].nombre===svcName;});
       var esAreaSinCantidad=svcKey&&SERVICIOS_SIN_CANTIDAD_REAL.indexOf(svcKey)>-1;
