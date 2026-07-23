@@ -790,8 +790,14 @@ function evaluarCapacidadDia(fechaISO, minutosNecesarios, idExcluir){
   var horaFin=diaSemana===6?cfg.sab_fin:cfg.lunvie_fin;
   var minutosDisponiblesDia=minutosEntreHoras(horaIni,horaFin);
 
+  // AJUSTE (23-jul-2026, a pedido de Ani): esta función solo se usa en la
+  // Agenda Semanal, que existe para saber cuántas órdenes hay PROGRAMADAS
+  // (confirmadas por el cliente, con fecha y hora) para armar la Orden de
+  // Trabajo del día — las Pagadas ya se completaron y no aportan nada a esa
+  // planificación, así que se excluyen. Antes se contaban ambas, lo que
+  // generaba el % de ocupación desalineado con el número de tarjetas visibles.
   var reservasDia=(todasCotizaciones||[]).filter(function(q){
-    return q.fecha_servicio===fechaISO && q.id!==idExcluir && (q.estado==='aprobada'||q.estado==='pagada');
+    return q.fecha_servicio===fechaISO && q.id!==idExcluir && q.estado==='aprobada';
   });
 
   if(reservasDia.length>=cfg.max_clientes_dia){
@@ -868,6 +874,12 @@ function renderAgendaSemanal(){
     // visual. La ocupación real del día (cap, abajo) sigue contando las
     // pagadas igual que antes, porque esa sí necesita reflejar la carga real
     // del técnico ese día para evaluar disponibilidad futura.
+    // AJUSTE (23-jul-2026, a pedido de Ani): la Agenda Semanal existe para
+    // saber cuántas órdenes están PROGRAMADAS (el cliente ya confirmó fecha
+    // y hora) y así armar la Orden de Trabajo del día — por eso solo se
+    // muestran y cuentan las Aprobadas. Las Pagadas ya se completaron y no
+    // aportan nada a esta vista de planificación futura, así que se excluyen
+    // por completo (tanto del número como de la barra de % — ver evaluarCapacidadDia).
     var reservasDia=(todasCotizaciones||[]).filter(function(q){
       return q.fecha_servicio===fechaISO && q.estado==='aprobada';
     });
@@ -901,7 +913,7 @@ function renderAgendaSemanal(){
       });
       h+='</div>';
       h+='<div style="display:flex;gap:5px;margin-top:4px">';
-      h+='<button type="button" onclick="generarOrdenTrabajoWord(\''+fechaISO+'\')" style="flex:1;background:#1B4332;color:white;border:none;border-radius:8px;padding:7px 6px;font-size:10px;font-weight:800;cursor:pointer">📋 Word</button>';
+      h+='<button type="button" onclick="generarOrdenTrabajoWord(\''+fechaISO+'\')" style="flex:1;background:#F2A488;color:#7C2D12;border:none;border-radius:8px;padding:7px 6px;font-size:10px;font-weight:800;cursor:pointer">📋 Word</button>';
       h+='<button type="button" onclick="generarOrdenTrabajo(\''+fechaISO+'\')" style="flex:1;background:#40916C;color:white;border:none;border-radius:8px;padding:7px 6px;font-size:10px;font-weight:800;cursor:pointer">🖨️ PDF</button>';
       h+='</div>';
     }
