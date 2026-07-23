@@ -21,7 +21,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 .q-client{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:18px}
 .svc-block{margin-bottom:16px}
 .svc-name{font-size:13px;font-weight:800;color:#2D6A4F;text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px}
-.svc-item{font-size:15px;color:#4a5568;padding:5px 0;border-bottom:1px solid #f0f2f5;line-height:1.55}
+.svc-item{font-size:15px;color:#4a5568;padding:5px 0 5px 16px;text-indent:-16px;border-bottom:1px solid #f0f2f5;line-height:1.55}
 
 .totals{background:#F0FAF4;border-radius:13px;padding:16px 18px;margin-top:18px}
 .t-row{display:flex;justify-content:space-between;font-size:15px;color:#2D6A4F;padding:4px 0}
@@ -70,6 +70,19 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
 .hora-slot.ocupada{border-color:#F1F3F5;background:#F1F3F5;color:#A0AEC0;cursor:not-allowed}
 .hora-nota{font-size:12px;color:#a0aec0;text-align:center;margin-top:2px}
 .btn-volver{width:100%;background:none;border:1.5px solid #D8F3DC;color:#2D6A4F;border-radius:11px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:14px;font-family:inherit}
+
+.dato-title{font-size:18px;font-weight:800;color:#1B4332;margin-bottom:7px;text-align:center}
+.dato-sub{font-size:14px;color:#718096;text-align:center;margin-bottom:18px;line-height:1.55}
+.dato-campo{margin-bottom:14px}
+.dato-campo label{display:block;font-size:13px;font-weight:700;color:#2D6A4F;margin-bottom:5px}
+.dato-campo input{width:100%;border:1.5px solid #95D5B2;border-radius:10px;padding:12px 13px;font-size:15px;font-family:inherit}
+.dato-campo input:focus{outline:none;border-color:#40916C}
+.dato-error{font-size:12.5px;color:#DC2626;margin-top:5px;display:none}
+.btn-guardar-dato{width:100%;background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:13px;padding:15px;font-size:15.5px;font-weight:700;cursor:pointer;margin-top:6px}
+
+.retry-box{text-align:center;padding:30px 20px;color:#78350F;background:#FFF8E1;border:1.5px solid #F0B75A;border-radius:14px;font-size:14.5px;line-height:1.6}
+.btn-reintentar{width:100%;background:linear-gradient(135deg,#40916C,#52B788);color:white;border:none;border-radius:12px;padding:13px;font-size:14.5px;font-weight:700;cursor:pointer;margin-top:16px}
+.btn-whatsapp{display:block;width:100%;text-align:center;text-decoration:none;background:none;border:1.5px solid #40916C;color:#2D6A4F;border-radius:12px;padding:11px;font-size:13.5px;font-weight:700;margin-top:9px;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -176,7 +189,7 @@ function renderQuote(){
     orden.forEach(function(nombre){
       h += '<div class="svc-block"><div class="svc-name">'+esc(nombre)+'</div>';
       grupos[nombre].forEach(function(it){
-        h += '<div class="svc-item">'+esc(descItem(it))+'</div>';
+        h += '<div class="svc-item">• '+esc(descItem(it))+'</div>';
       });
       h += '</div>';
     });
@@ -188,7 +201,7 @@ function renderQuote(){
       h += '<div class="svc-block"><div class="svc-name">'+esc(svcName)+'</div>';
       for(var li=1;li<lines.length;li++){
         if(!lines[li].trim()) continue;
-        h += '<div class="svc-item">'+esc(lines[li].replace(/^\s*\d+\.\s*/,''))+'</div>';
+        h += '<div class="svc-item">• '+esc(lines[li].replace(/^\s*\d+\.\s*/,''))+'</div>';
       }
       h += '</div>';
     }
@@ -331,11 +344,109 @@ async function aprobar(){
     }
     notificarPorEmail('aprobada', null); // aviso interno a Ani (ya existía)
     quoteData.estado='aprobada';
-    mostrarSeleccionFecha(); // pantalla nueva — el cliente elige fecha antes del Correo 3
+    verificarDatosObligatorios(); // AJUSTE (22-jul-2026, a pedido de Ani): antes de seguir a la
+    // selección de fecha/hora, se verifica que estén completos los datos
+    // necesarios para el servicio (dirección, nombre, teléfono) — si falta
+    // algo, se le pide al cliente que lo complete aquí mismo antes de continuar.
   } catch(e){
     body.innerHTML = '<div class="error-box">⚠️ Error al procesar. Intenta de nuevo o contáctanos por WhatsApp.</div>';
     console.error(e);
   }
+}
+
+// ===================== VERIFICACIÓN DE DATOS OBLIGATORIOS =====================
+// Punto 2 (pedido de Ani, 22-jul-2026): al aprobar, es obligatorio que la
+// cotización tenga fecha, dirección, datos del cliente y detalle de la orden.
+// El detalle de la orden y (normalmente) nombre/teléfono/email ya son
+// obligatorios desde el formulario público de solicitud — el único campo que
+// históricamente se dejaba opcional ahí es la Dirección, así que es el caso
+// real que se cubre aquí, pero se revisan los 4 por seguridad.
+function verificarDatosObligatorios(){
+  var q = quoteData;
+  var faltantes = [];
+  if(!q.cliente_direccion || !String(q.cliente_direccion).trim()) faltantes.push({campo:'cliente_direccion', label:'Dirección completa', placeholder:'Ej: Calle 50, Edificio Torre Azul, piso 4'});
+  if(!q.cliente_nombre || !String(q.cliente_nombre).trim()) faltantes.push({campo:'cliente_nombre', label:'Nombre completo', placeholder:'Tu nombre completo'});
+  if(!q.cliente_telefono || !String(q.cliente_telefono).trim()) faltantes.push({campo:'cliente_telefono', label:'Teléfono', placeholder:'6XXX-XXXX'});
+  if(!q.servicios || !q.servicios.length) faltantes.push({campo:'servicios', label:'Detalle del servicio', placeholder:''});
+
+  if(faltantes.length===0){
+    mostrarSeleccionFecha();
+    return;
+  }
+  // El detalle de servicios no se puede completar desde este formulario del
+  // cliente — si eso llega a faltar, es un caso anómalo que requiere que Ani
+  // lo revise directamente, no se le pide al cliente que lo invente.
+  var faltaServicios = faltantes.some(function(f){ return f.campo==='servicios'; });
+  if(faltaServicios){
+    var body = document.getElementById('bodyContent');
+    body.innerHTML = '<div class="error-box">⚠️ Tu cotización quedó aprobada, pero el detalle del servicio no se pudo cargar correctamente.<br><br>Por favor contáctanos por WhatsApp para coordinar tu servicio.<br><br><a class="btn-whatsapp" href="https://wa.me/50763171227" target="_blank">📱 Escribir por WhatsApp</a></div>';
+    return;
+  }
+  mostrarFormularioDatosFaltantes(faltantes.filter(function(f){ return f.campo!=='servicios'; }));
+}
+
+function mostrarFormularioDatosFaltantes(faltantes){
+  var body = document.getElementById('bodyContent');
+  var h = '<div class="dato-title">📋 Un último paso</div>';
+  h += '<div class="dato-sub">Para poder coordinar tu servicio necesitamos que completes estos datos.</div>';
+  faltantes.forEach(function(f){
+    h += '<div class="dato-campo">';
+    h += '<label for="campo_'+f.campo+'">'+esc(f.label)+'</label>';
+    h += '<input type="text" id="campo_'+f.campo+'" placeholder="'+esc(f.placeholder)+'">';
+    h += '<div class="dato-error" id="err_'+f.campo+'">Este campo es obligatorio.</div>';
+    h += '</div>';
+  });
+  h += '<button type="button" class="btn-guardar-dato" onclick="guardarDatosFaltantes(['+faltantes.map(function(f){return "'"+f.campo+"'";}).join(',')+'])">Continuar</button>';
+  body.innerHTML = h;
+}
+
+async function guardarDatosFaltantes(campos){
+  var valores = {};
+  var valido = true;
+  campos.forEach(function(campo){
+    var input = document.getElementById('campo_'+campo);
+    var val = (input.value||'').trim();
+    var errEl = document.getElementById('err_'+campo);
+    if(!val){
+      errEl.style.display='block';
+      valido = false;
+    } else {
+      errEl.style.display='none';
+      valores[campo] = val;
+    }
+  });
+  if(!valido) return;
+
+  var body = document.getElementById('bodyContent');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>Guardando tus datos...</div>';
+  try{
+    var {data, error} = await sb.rpc('actualizar_datos_cliente_cotizacion', {
+      p_token: TOKEN,
+      p_direccion: valores.cliente_direccion || null,
+      p_nombre: valores.cliente_nombre || null,
+      p_telefono: valores.cliente_telefono || null
+    });
+    if(error) throw error;
+    Object.keys(valores).forEach(function(campo){ quoteData[campo] = valores[campo]; });
+    mostrarSeleccionFecha();
+  } catch(e){
+    console.error('Error guardando datos del cliente:', e);
+    mostrarErrorConReintento('No se pudieron guardar tus datos. Por favor intenta de nuevo.', function(){ mostrarFormularioDatosFaltantes(campos.map(function(c){ return {campo:c, label:c, placeholder:''}; })); });
+  }
+}
+
+// Pantalla genérica de error con botón de reintentar — reemplaza los antiguos
+// "caminos de respaldo" que dejaban seguir el flujo SIN fecha u hora
+// confirmada. Ahora, si algo falla, se le pide al cliente reintentar (o
+// escribir por WhatsApp), pero nunca se completa la aprobación sin fecha y
+// hora reales. (Punto 1, pedido de Ani, 22-jul-2026)
+function mostrarErrorConReintento(mensaje, funcionReintento){
+  window._reintentoActual = funcionReintento;
+  var body = document.getElementById('bodyContent');
+  body.innerHTML = '<div class="retry-box">⚠️ '+esc(mensaje)+
+    '<button type="button" class="btn-reintentar" onclick="window._reintentoActual && window._reintentoActual()">🔄 Reintentar</button>'+
+    '<a class="btn-whatsapp" href="https://wa.me/50763171227" target="_blank">📱 Prefiero coordinar por WhatsApp</a>'+
+    '</div>';
 }
 
 // ===================== PANTALLA DE CONFIRMACIÓN DE HORA =====================
@@ -404,18 +515,20 @@ async function mostrarSeleccionFecha(){
     }
 
     if(!hayAlgunoLibre){
-      // Ni un solo día libre/con espacio en las 2 semanas — no se bloquea al
-      // cliente, se avisa y se sigue el flujo sin fecha confirmada (Ani la coordina a mano).
-      notificarSinFechaYContinuar();
+      // AJUSTE (22-jul-2026, Punto 1): ya no se permite continuar sin fecha
+      // confirmada. Si no hay ni un día libre en las 2 semanas, se avisa
+      // claramente y se ofrece reintentar o coordinar por WhatsApp — pero la
+      // aprobación no se da por completa hasta que haya fecha y hora reales.
+      mostrarErrorConReintento('En este momento no encontramos días disponibles en las próximas 2 semanas. Por favor reintenta en unos minutos, o coordina directamente con nosotros.', mostrarSeleccionFecha);
       return;
     }
 
     renderSeleccionFecha(dias);
   } catch(e){
     console.error('Error buscando disponibilidad:', e);
-    // Si algo falla (tablas no cargadas, red, etc.), no se bloquea al cliente —
-    // se sigue el flujo anterior sin fecha confirmada, como estaba antes de esta función.
-    notificarSinFechaYContinuar();
+    // AJUSTE (22-jul-2026, Punto 1): ya no se sigue el flujo sin fecha si algo
+    // falla — se pide reintentar en vez de dejar la orden sin fecha/hora.
+    mostrarErrorConReintento('No se pudieron cargar las fechas disponibles. Por favor reintenta.', mostrarSeleccionFecha);
   }
 }
 
@@ -512,8 +625,9 @@ async function elegirFecha(fechaISO){
     renderSeleccionHora(fechaISO, slots);
   } catch(e){
     console.error('Error buscando horarios:', e);
-    // Si falla, no se bloquea al cliente — se confirma solo con la fecha, sin hora específica.
-    confirmarFechaSinHora(fechaISO);
+    // AJUSTE (22-jul-2026, Punto 1): ya no se confirma solo la fecha sin hora
+    // — se pide reintentar, para garantizar que siempre quede una hora real.
+    mostrarErrorConReintento('No se pudieron cargar los horarios disponibles para ese día. Por favor reintenta.', function(){ elegirFecha(fechaISO); });
   }
 }
 
@@ -587,33 +701,11 @@ async function elegirHora(fechaISO, hora24){
     mostrarResultado(true);
   } catch(e){
     console.error('Error confirmando fecha y hora:', e);
-    confirmarFechaSinHora(fechaISO);
+    // AJUSTE (22-jul-2026, Punto 1): antes esto caía a "guardar solo la fecha,
+    // sin hora" — eliminado. Ahora se obliga a reintentar la selección de hora,
+    // nunca se completa la aprobación sin una hora real confirmada.
+    mostrarErrorConReintento('No se pudo confirmar tu hora. Por favor reintenta.', function(){ elegirFecha(fechaISO); });
   }
-}
-
-// Camino de respaldo: si falla la confirmación con hora, se intenta guardar
-// solo la fecha (como funcionaba antes de agregar selección de hora).
-async function confirmarFechaSinHora(fechaISO){
-  try{
-    var {data, error} = await sb.rpc('confirmar_fecha_servicio', {p_token:TOKEN, p_fecha:fechaISO});
-    if(error) throw error;
-    quoteData.fecha_servicio = fechaISO;
-    enviarCorreoAprobacionCliente();
-    crearEventoCalendar();
-    mostrarResultado(true);
-  } catch(e){
-    console.error('Error confirmando fecha:', e);
-    notificarSinFechaYContinuar();
-  }
-}
-
-// Camino de respaldo: si por cualquier motivo no se pudo mostrar/guardar la
-// selección de fecha, el cliente NO se queda atascado — se manda el Correo 3
-// sin fecha (como funcionaba antes de esta función) y Ani coordina la fecha
-// directamente con el cliente.
-function notificarSinFechaYContinuar(){
-  enviarCorreoAprobacionCliente();
-  mostrarResultado(true);
 }
 
 async function confirmarCancelar(){
