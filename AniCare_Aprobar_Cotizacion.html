@@ -332,26 +332,16 @@ async function enviarCorreoAprobacionCliente(){
   } catch(e){ console.warn('No se pudo enviar el correo de confirmación al cliente:', e); }
 }
 
-async function aprobar(){
-  var body = document.getElementById('bodyContent');
-  body.innerHTML = '<div class="loading"><div class="spinner"></div>Procesando...</div>';
-  try{
-    var {data, error} = await sb.rpc('responder_cotizacion', {p_token:TOKEN, p_decision:'aprobada', p_motivo:null});
-    if(error) throw error;
-    if(!data){
-      body.innerHTML = '<div class="error-box">⚠️ No se pudo procesar. Es posible que ya hayas respondido antes.</div>';
-      return;
-    }
-    notificarPorEmail('aprobada', null); // aviso interno a Ani (ya existía)
-    quoteData.estado='aprobada';
-    verificarDatosObligatorios(); // AJUSTE (22-jul-2026, a pedido de Ani): antes de seguir a la
-    // selección de fecha/hora, se verifica que estén completos los datos
-    // necesarios para el servicio (dirección, nombre, teléfono) — si falta
-    // algo, se le pide al cliente que lo complete aquí mismo antes de continuar.
-  } catch(e){
-    body.innerHTML = '<div class="error-box">⚠️ Error al procesar. Intenta de nuevo o contáctanos por WhatsApp.</div>';
-    console.error(e);
-  }
+// AJUSTE (23-jul-2026, a pedido de Ani): antes, al hacer clic en "Aprobar
+// Cotización" se guardaba inmediatamente estado='aprobada' en la base de
+// datos — así que si después fallaba la selección de fecha/hora (ej. "no hay
+// días disponibles"), la orden igual quedaba marcada como Aprobada en el
+// Panel Admin, sin fecha ni hora real. Ahora este botón NO escribe nada en la
+// base de datos — solo avanza el flujo. La cotización recién se marca como
+// Aprobada al final, cuando el cliente efectivamente elige la hora (ver
+// elegirHora más abajo), todo en un solo paso atómico.
+function aprobar(){
+  verificarDatosObligatorios();
 }
 
 // ===================== VERIFICACIÓN DE DATOS OBLIGATORIOS =====================
@@ -379,7 +369,7 @@ function verificarDatosObligatorios(){
   var faltaServicios = faltantes.some(function(f){ return f.campo==='servicios'; });
   if(faltaServicios){
     var body = document.getElementById('bodyContent');
-    body.innerHTML = '<div class="error-box">⚠️ Tu cotización quedó aprobada, pero el detalle del servicio no se pudo cargar correctamente.<br><br>Por favor contáctanos por WhatsApp para coordinar tu servicio.<br><br><a class="btn-whatsapp" href="https://wa.me/50763171227" target="_blank">📱 Escribir por WhatsApp</a></div>';
+    body.innerHTML = '<div class="error-box">⚠️ El detalle de tu servicio no se pudo cargar correctamente.<br><br>Por favor contáctanos por WhatsApp para coordinar tu servicio.<br><br><a class="btn-whatsapp" href="https://wa.me/50763171227" target="_blank">📱 Escribir por WhatsApp</a></div>';
     return;
   }
   mostrarFormularioDatosFaltantes(faltantes.filter(function(f){ return f.campo!=='servicios'; }));
@@ -388,7 +378,7 @@ function verificarDatosObligatorios(){
 function mostrarFormularioDatosFaltantes(faltantes){
   var body = document.getElementById('bodyContent');
   var h = '<div class="dato-title">📋 Un último paso</div>';
-  h += '<div class="dato-sub">Para poder coordinar tu servicio necesitamos que completes estos datos.</div>';
+  h += '<div class="dato-sub">Confirmar los últimos datos para finalizar.</div>';
   faltantes.forEach(function(f){
     h += '<div class="dato-campo">';
     h += '<label for="campo_'+f.campo+'">'+esc(f.label)+'</label>';
@@ -688,22 +678,36 @@ function renderSeleccionHora(fechaISO, slots){
   body.innerHTML = h;
 }
 
+// AJUSTE (23-jul-2026, a pedido de Ani): este es el ÚNICO punto donde la
+// cotización realmente se marca como Aprobada en la base de datos — antes
+// eso pasaba en cuanto el cliente daba clic en "Aprobar Cotización" (mucho
+// antes), lo que causaba que órdenes quedaran marcadas como Aprobadas en el
+// Panel Admin aunque nunca se hubiera podido confirmar fecha/hora (ej. "no
+// hay días disponibles"). Ahora se usa una función en la base de datos
+// (aprobar_con_hora) que hace las dos cosas — aprobar y guardar fecha/hora —
+// en un solo paso atómico: si algo falla a mitad de camino, no queda nada a
+// medias, la cotización sigue en estado 'cotizado' como si nada hubiera pasado.
 async function elegirHora(fechaISO, hora24){
   var body = document.getElementById('bodyContent');
-  body.innerHTML = '<div class="loading"><div class="spinner"></div>Confirmando fecha y hora...</div>';
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>Confirmando tu servicio...</div>';
   try{
-    var {data, error} = await sb.rpc('confirmar_fecha_hora_servicio', {p_token:TOKEN, p_fecha:fechaISO, p_hora:hora24});
+    var {data, error} = await sb.rpc('aprobar_con_hora', {p_token:TOKEN, p_fecha:fechaISO, p_hora:hora24});
     if(error) throw error;
+    if(!data){
+      body.innerHTML = '<div class="error-box">⚠️ No se pudo procesar. Es posible que ya hayas respondido antes.</div>';
+      return;
+    }
+    quoteData.estado='aprobada';
     quoteData.fecha_servicio = fechaISO;
     quoteData.hora_servicio = hora24;
+    notificarPorEmail('aprobada', null); // aviso interno a Ani — ahora sí, ya con todo confirmado
     enviarCorreoAprobacionCliente(); // Correo 3 — ahora sí con fecha y hora confirmadas
     crearEventoCalendar(); // Evento en Google Calendar de AniCare
     mostrarResultado(true);
   } catch(e){
     console.error('Error confirmando fecha y hora:', e);
-    // AJUSTE (22-jul-2026, Punto 1): antes esto caía a "guardar solo la fecha,
-    // sin hora" — eliminado. Ahora se obliga a reintentar la selección de hora,
-    // nunca se completa la aprobación sin una hora real confirmada.
+    // Se obliga a reintentar la selección de hora — nunca se completa la
+    // aprobación sin una hora real confirmada.
     mostrarErrorConReintento('No se pudo confirmar tu hora. Por favor reintenta.', function(){ elegirFecha(fechaISO); });
   }
 }

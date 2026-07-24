@@ -378,11 +378,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
       <details class="indic-card" style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px">
         <summary style="color:#1B4332;font-size:14px;font-weight:700;cursor:pointer;list-style:revert">📆 Cómo funciona la Agenda Semanal</summary>
         <div style="margin-top:10px">
-        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Es la pestaña con las tarjetas de lunes a domingo. Te muestra, día por día, cuánta capacidad de trabajo llevas ocupada y quién tiene servicio agendado — de un vistazo, sin tener que abrir cada cotización.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Es la pestaña con las tarjetas de día por día — muestra <b>12 días seguidos</b> de una vez (usa "← Anterior" / "Siguiente →" para moverte de 12 en 12 días). Te muestra cuánta capacidad de trabajo llevas ocupada y quién tiene servicio agendado — de un vistazo, sin tener que abrir cada cotización.</p>
 
         <p style="font-size:12.5px;color:#1B4332;font-weight:700;margin-bottom:6px">Qué órdenes aparecen ahí:</p>
         <ul style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:12px">
-          <li>✅ <b>Aprobadas</b> — sí aparecen. Son las que el cliente ya confirmó y todavía están por realizarse, así que son justo lo que necesitas ver para planear tu semana.</li>
+          <li>✅ <b>Aprobadas</b> — sí aparecen. Son las que el cliente ya confirmó (con fecha Y hora) y todavía están por realizarse, así que son justo lo que necesitas ver para planear tu semana.</li>
           <li>💰 <b>Pagadas</b> — no aparecen. El servicio ya se hizo, así que dejarlas ahí solo sería ruido visual en una vista pensada para "qué me falta por atender". Siguen estando disponibles como siempre en la pestaña Cotizaciones si necesitas revisarlas.</li>
         </ul>
 
@@ -392,12 +392,26 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
           <li>🟠 <b>Naranja</b> — alta demanda (≥75% de la jornada ocupada); todavía se puede agendar, pero queda poco margen.</li>
           <li>⬜ <b>Gris / "Cerrado"</b> — domingo, o el día ya está a su máxima capacidad de clientes.</li>
         </ul>
-        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Importante: ese porcentaje de ocupación SÍ cuenta las órdenes pagadas además de las aprobadas — porque refleja el tiempo real que tu técnico tiene comprometido ese día, sin importar si ya se cobró o no. Por eso puede pasar que la barra se vea alta (ej. naranja) aunque solo veas 1 chip de cliente debajo: el otro tiempo ocupado es de una orden que ya se pagó y por eso no se muestra como tarjeta, pero sigue "gastando" horas de esa jornada.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Nota: tanto el % de ocupación como el número de clientes debajo de cada fecha cuentan ÚNICAMENTE órdenes Aprobadas — las Pagadas ya se completaron y no aportan nada a esta vista de planificación futura, así que quedan fuera por completo (número y barra siempre coinciden, sin desfases).</p>
 
         <p style="font-size:12.5px;color:#1B4332;font-weight:700;margin-bottom:6px">De dónde sale esa capacidad:</p>
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Usa las mismas <b>Reglas de Calendarización</b> que configuras en el modal correspondiente (horario Lun-Vie, horario Sábado, si el Domingo está cerrado, máximo de clientes por día, y el margen de traslado entre servicios) — el mismo motor que usa la pantalla donde el cliente elige día y hora al aprobar su cotización. Si cambias esas reglas, la Agenda Semanal se actualiza sola.</p>
 
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7">Tip: toca cualquier chip de cliente en la agenda y te lleva directo a su cotización en la pestaña Cotizaciones, ya abierta, para que no tengas que buscarla.</p>
+        </div>
+      </details>
+
+      <details class="indic-card" style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px">
+        <summary style="color:#1B4332;font-size:14px;font-weight:700;cursor:pointer;list-style:revert">✅ Cómo funciona la aprobación del cliente (fecha, hora y dirección obligatorias)</summary>
+        <div style="margin-top:10px">
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">Cuando el cliente da clic en "Aprobar Cotización" en el enlace que le llega, el sistema NO la marca como Aprobada todavía. Primero pasa por estos pasos, todos obligatorios:</p>
+        <ol style="font-size:12.5px;color:#4a5568;line-height:1.9;margin-left:18px;margin-bottom:12px">
+          <li><b>Datos del cliente</b> — si falta la dirección o el teléfono (la dirección es opcional en el formulario original de solicitud, así que puede faltar), se le muestra una ventana pidiéndole justo eso antes de seguir.</li>
+          <li><b>Fecha</b> — elige un día disponible de los próximos 15 días.</li>
+          <li><b>Hora</b> — elige una franja de 30 min ese día. No hay forma de saltarse este paso ni de continuar sin elegir hora.</li>
+        </ol>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:10px">La cotización recién se marca como <b>Aprobada</b> en el instante en que el cliente elige la hora — todo (aprobar + guardar fecha + guardar hora) pasa junto, en un solo paso. Si algo falla a mitad de camino (ej. no hay cupo disponible en las próximas 2 semanas, o se cae la conexión), la cotización sigue en "Esperando Respuesta" como si nada hubiera pasado — nunca queda una orden marcada como Aprobada sin fecha y hora reales.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7">Si algo falla, al cliente se le ofrece "Reintentar" o "Coordinar por WhatsApp" — nunca se le deja atascado sin salida.</p>
         </div>
       </details>
 
@@ -461,7 +475,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF4F0;min-height:100vh
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Cotizaciones</b> — todas las solicitudes, organizadas en 5 estados (ver abajo). Aquí revisas, pones precios y avanzas cada una.</p>
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Gestión de Precios</b> — tu catálogo de tarifas por servicio. Lo que escribas aquí es lo que usa el sistema para calcular precios automáticos.</p>
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Directorio</b> — lista de todos tus clientes, con su historial de cotizaciones agrupado.</p>
-        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Agenda Semanal</b> — vista por día (lunes a domingo) de las órdenes aprobadas y cuánta capacidad de trabajo llevas ocupada. Ver la sección dedicada más abajo.</p>
+        <p style="font-size:12.5px;color:#4a5568;line-height:1.7;margin-bottom:6px"><b>Agenda Semanal</b> — vista de 12 días de las órdenes aprobadas y cuánta capacidad de trabajo llevas ocupada. Ver la sección dedicada más abajo.</p>
         <p style="font-size:12.5px;color:#4a5568;line-height:1.7"><b>Indicaciones</b> — esta pestaña, con la guía que estás leyendo ahora.</p>
         </div>
       </details>
