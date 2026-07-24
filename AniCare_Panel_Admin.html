@@ -894,8 +894,15 @@ function renderAgendaSemanal(){
     var esHoy = fmtISO(new Date())===fechaISO;
 
     h+='<div style="background:white;border:1.5px solid '+(esHoy?'#40916C':'#E2E8F0')+';border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px">';
+    // AJUSTE (23-jul-2026, a pedido de Ani): el % de ocupado ahora va a la
+    // par de la fecha, alineado a la derecha, en vez de en una línea aparte.
+    h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">';
     h+='<div><div style="font-size:12.5px;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.3px">'+d.toLocaleDateString('es-PA',{weekday:'long'})+'</div>';
     h+='<div style="font-size:19px;font-weight:900;color:#1B2838">'+d.toLocaleDateString('es-PA',{day:'2-digit',month:'short'})+'</div></div>';
+    if(!cerrado){
+      h+='<div style="font-size:13px;font-weight:800;color:'+colorBarra+';white-space:nowrap;margin-top:2px">'+pct+'% ocupado</div>';
+    }
+    h+='</div>';
 
     if(cerrado){
       h+='<div style="font-size:12.5px;color:#94A3B8;font-weight:700">Cerrado</div>';
@@ -905,7 +912,7 @@ function renderAgendaSemanal(){
       // de clientes agendados ese día, con singular/plural correcto.
       var textoClientes = reservasDia.length===1 ? '1 cliente' : reservasDia.length+' clientes';
       h+='<div style="background:#F1F5F4;border-radius:7px;height:9px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+colorBarra+'"></div></div>';
-      h+='<div style="font-size:12px;color:#718096;font-weight:600">'+pct+'% ocupado · '+textoClientes+'</div>';
+      h+='<div style="font-size:12px;color:#718096;font-weight:600">'+textoClientes+'</div>';
     }
 
     if(reservasDia.length>0){
@@ -921,8 +928,10 @@ function renderAgendaSemanal(){
       });
       h+='</div>';
       h+='<div style="display:flex;gap:5px;margin-top:4px">';
-      h+='<button type="button" onclick="generarOrdenTrabajoWord(\''+fechaISO+'\')" style="flex:1;background:#F2A488;color:#7C2D12;border:none;border-radius:8px;padding:7px 6px;font-size:10px;font-weight:800;cursor:pointer">📋 Word</button>';
-      h+='<button type="button" onclick="generarOrdenTrabajo(\''+fechaISO+'\')" style="flex:1;background:#40916C;color:white;border:none;border-radius:8px;padding:7px 6px;font-size:10px;font-weight:800;cursor:pointer">🖨️ PDF</button>';
+      // AJUSTE (23-jul-2026, a pedido de Ani): ambos botones en gris elegante
+      // (mismo tono, sutil), con el ícono bien visible en vez de colores fuertes.
+      h+='<button type="button" onclick="generarOrdenTrabajoWord(\''+fechaISO+'\')" style="flex:1;background:#EDF0F2;color:#3D4852;border:1px solid #D6DCE1;border-radius:8px;padding:8px 6px;font-size:10.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px"><span style="font-size:14px">📋</span>Word</button>';
+      h+='<button type="button" onclick="generarOrdenTrabajo(\''+fechaISO+'\')" style="flex:1;background:#EDF0F2;color:#3D4852;border:1px solid #D6DCE1;border-radius:8px;padding:8px 6px;font-size:10.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px"><span style="font-size:14px">🖨️</span>PDF</button>';
       h+='</div>';
     }
 
